@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>github-mate — worktree</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fcfcfa;
+  --side: #f2f3ef;
+  --line: #e2e4de;
+  --ink: #1c201e;
+  --ink2: #58605b;
+  --ink3: #8a918c;
+  --hover: #e9ebe5;
+  --sel: #e0e3dc;
+  --band: #f1f2ee;
+  --need: #b05a00;
+  --bad: #cf222e;
+  --add: #24744a;
+  --add-bg: #e4f3e9;
+  --del: #b03535;
+  --del-bg: #fbe9e7;
+  --shadow: 0 8px 28px rgba(28, 32, 30, .14), 0 0 0 1px rgba(28, 32, 30, .08);
+  --ui: "Inter", "SF Pro Text", "Segoe UI", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, "DejaVu Sans Mono", "Noto Sans Mono CJK JP", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161918;
+    --side: #1c201f;
+    --line: #2a2f2d;
+    --ink: #e2e5e1;
+    --ink2: #a1a9a4;
+    --ink3: #6d7570;
+    --hover: #242928;
+    --sel: #2c3230;
+    --band: #1f2423;
+    --need: #eda64e;
+    --bad: #ff7b72;
+    --add: #7cc596;
+    --add-bg: #1b2e23;
+    --del: #e79090;
+    --del-bg: #3a2020;
+    --shadow: 0 8px 28px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .08);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 13px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+  display: grid; grid-template-columns: clamp(256px, 20vw, 292px) minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 4px; }
+svg { flex: none; display: block; }
+.mono { font-family: var(--mono); }
+
+/* ---------- 状態マーク ---------- */
+.mark { width: 10px; height: 10px; flex: none; display: inline-grid; place-items: center; color: var(--ink3); }
+.mark.need::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--need); }
+.mark.seen::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--need); }
+.mark.need.bad::before { background: var(--bad); }
+.mark.seen.bad::before { border-color: var(--bad); }
+.pip { width: 6px; height: 6px; border-radius: 50%; background: var(--need); flex: none; }
+.pip.bad { background: var(--bad); }
+.pip[hidden] { display: none; }
+.mark.wait::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.mark.run::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink2); border-right-color: transparent; animation: rot 1.5s linear infinite; }
+.mark.done svg { width: 10px; height: 10px; }
+@keyframes rot { to { transform: rotate(360deg); } }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mark.run::before, .cur { animation: none !important; } }
+
+/* ---------- サイドバー ---------- */
+.side { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.side-top { display: flex; align-items: center; gap: 4px; padding: 10px 10px 4px; }
+.repo { flex: 1; min-width: 0; }
+.repo > summary, .more > summary { list-style: none; cursor: pointer; }
+.repo > summary::-webkit-details-marker, .more > summary::-webkit-details-marker { display: none; }
+.repo > summary { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border-radius: 6px; font-weight: 600; }
+.repo > summary:hover, .icon-btn:hover { background: var(--hover); }
+.repo > summary .dim { color: var(--ink3); font-weight: 400; }
+.repo > summary svg { color: var(--ink3); margin-left: auto; }
+.icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 6px; color: var(--ink2); flex: none; }
+details { position: relative; }
+.pop { position: absolute; z-index: 20; top: calc(100% + 4px); min-width: 220px; padding: 4px; background: var(--bg); border-radius: 8px; box-shadow: var(--shadow); }
+.pop.right { right: 0; }
+.pop button { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border-radius: 5px; white-space: nowrap; }
+.pop button:hover:not(:disabled) { background: var(--hover); }
+.pop button:disabled { color: var(--ink3); }
+.pop button svg { color: var(--ink2); }
+.pop button .end { margin-left: auto; color: var(--ink3); font-size: 12px; }
+.pop button .end.need { color: var(--need); }
+.pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.pop .danger, .pop .danger svg { color: var(--del); }
+
+.nav { display: flex; gap: 2px; padding: 2px 10px 10px; border-bottom: 1px solid var(--line); }
+.nav button { height: 28px; padding: 0 8px; border-radius: 6px; color: var(--ink2); display: flex; align-items: center; gap: 6px; }
+.nav button:hover { background: var(--hover); }
+.nav .cnt { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.nav button[aria-current] { color: var(--ink); font-weight: 600; background: var(--sel); }
+
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0; }
+.grp { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 18px; font-size: 11.5px; color: var(--ink3); background: var(--band); border-bottom: 1px solid var(--line); }
+.grp.need { color: var(--ink); font-weight: 600; }
+.grp .un { margin-left: auto; font-weight: 400; color: var(--ink2); }
+.row { display: grid; position: relative; grid-template-columns: 18px minmax(0, 1fr) auto; grid-template-rows: 20px 18px; align-content: center; column-gap: 2px; align-items: center; width: 100%; height: 54px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+.row:hover { background: var(--hover); }
+.row[aria-selected="true"] { background: var(--sel); }
+.row .br { grid-column: 2 / 4; grid-row: 1; font: 400 12.5px/20px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .br i { font-style: normal; color: var(--ink3); font-weight: 400; }
+.row .why { grid-column: 2; display: flex; align-items: center; gap: 7px; height: 18px; font-size: 12px; line-height: 18px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .ref { font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; padding-left: 8px; }
+.row .why { grid-row: 2; }
+.row .ref { grid-column: 3; grid-row: 2; }
+.row .del { position: absolute; right: 12px; top: 5px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; color: var(--ink3); background: var(--side); box-shadow: -8px 0 6px var(--side); opacity: 0; }
+.row:hover .del { background: var(--hover); box-shadow: -8px 0 6px var(--hover); }
+.row[aria-selected="true"] .del { background: var(--sel); box-shadow: -8px 0 6px var(--sel); }
+.row:hover .del, .row[aria-selected="true"] .del, .row.done .del, .row .del:focus-visible { opacity: 1; }
+.row .del:hover { background: var(--del-bg) !important; color: var(--del); }
+.row.need .why { color: var(--ink); }
+.row.unread .br { font-weight: 600; }
+.row.unread .why { color: var(--need); font-weight: 500; }
+.row.unread.bad .why { color: var(--bad); }
+.row .more { color: var(--ink3); font-size: 11.5px; font-weight: 400; }
+.row.quiet .br { font-weight: 400; color: var(--ink2); }
+.row.quiet .why { color: var(--ink3); }
+.side-foot { padding: 8px 10px; border-top: 1px solid var(--line); }
+.side-foot button { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 6px; color: var(--ink2); }
+.side-foot button:hover { background: var(--hover); }
+
+/* 設定の中の小見出し */
+.dlg .note.bad, .fld .note.bad { color: var(--bad); }
+.dlg .note.warnc, .fld .note.warnc { color: var(--need); }
+.note.bad:empty { display: none; }
+.set h3.sec { margin: 28px 0 4px; font-size: 14px; font-weight: 600; }
+
+/* ---------- メイン ---------- */
+.main { container-type: inline-size; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.head { display: flex; align-items: center; gap: 16px; padding: 16px 24px 10px; min-width: 0; }
+.head-l { flex: 1; min-width: 0; }
+.head h1 { margin: 0; font: 600 16px/1.4 var(--mono); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head h1 i { font-style: normal; font-weight: 400; color: var(--ink3); }
+.meta { display: flex; gap: 4px; margin: 3px 0 0 -7px; min-width: 0; }
+.meta button { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 7px; border-radius: 5px; color: var(--ink2); white-space: nowrap; min-width: 0; }
+.meta button:first-child { flex: 0 1 auto; }
+.meta button:not(:first-child) { flex: none; }
+.meta button span { overflow: hidden; text-overflow: ellipsis; }
+.meta button:hover { background: var(--hover); color: var(--ink); }
+.meta button[aria-expanded="true"] { background: var(--sel); color: var(--ink); }
+.meta button.none { color: var(--ink3); }
+.meta .need { color: var(--need); font-weight: 500; }
+.meta .bad { color: var(--bad); font-weight: 500; }
+.meta .on { color: var(--ink); }
+.meta .dim { color: var(--ink3); }
+.meta .num { font-variant-numeric: tabular-nums; }
+.btn { height: 30px; padding: 0 12px; border-radius: 6px; font-weight: 500; white-space: nowrap; flex: none; border: 1px solid var(--line); }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary:hover { opacity: .88; background: var(--ink); }
+.btn:disabled { color: var(--ink3); background: none; }
+
+.acts { display: flex; align-items: flex-start; padding: 0 16px 8px 17px; border-bottom: 1px solid var(--line); }
+.acts-in { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; height: 30px; overflow: hidden; }
+.act { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border-radius: 6px; color: var(--ink2); white-space: nowrap; }
+.act:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.act:disabled { color: var(--ink3); opacity: .55; }
+.act.gap { margin-left: 10px; }
+
+.tabs { display: flex; align-items: stretch; gap: 2px; padding: 8px 17px 0; border-bottom: 1px solid var(--line); min-width: 0; overflow: hidden; }
+.tab { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 9px; color: var(--ink2); white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; min-width: 0; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab b { font-weight: 500; }
+.tab[aria-selected="true"] b { font-weight: 600; }
+.tab .t { color: var(--ink3); overflow: hidden; text-overflow: ellipsis; }
+.tab .st { font-size: 12px; color: var(--ink3); }
+.tab .st.need { color: var(--need); font-weight: 500; }
+.tab .st.bad { color: var(--bad); font-weight: 500; }
+.tab .st.on { color: var(--ink2); }
+
+@container (max-width: 600px) { .tab:not([aria-selected="true"]) .t { display: none; } }
+
+.term { overflow-y: auto; padding: 18px 24px 24px; font: 12.5px/1.65 var(--mono); }
+.term div { white-space: pre-wrap; word-break: break-word; min-height: 1.65em; }
+.term .u { background: var(--band); margin: 6px -10px; padding: 3px 10px; border-radius: 4px; }
+.term .a, .term .t { padding-left: 1.6em; text-indent: -1.6em; }
+.term .a::before { content: "●  "; color: var(--ink3); }
+.term .t::before { content: "●  "; color: var(--add); }
+.term .t { font-weight: 600; }
+.term .o { color: var(--ink2); padding-left: 3.6em; text-indent: -2em; }
+.term .o::before { content: "⎿  "; color: var(--ink3); }
+.term .r { color: var(--ink2); }
+.term .m, .term .p { padding-left: 1.6em; }
+.term .m { color: var(--del); background: var(--del-bg); }
+.term .p { color: var(--add); background: var(--add-bg); }
+.term .dm { color: var(--ink3); }
+.term .e { color: var(--bad); }
+.term .s { color: var(--ink2); margin-top: 6px; display: flex; align-items: center; gap: 10px; }
+.term .sh b { font-weight: 400; color: var(--ink3); }
+.term .box { margin: 12px -10px 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink3); }
+.term .box.live { border-color: var(--ink3); color: var(--ink); }
+.cur { display: inline-block; width: .55em; height: 1.15em; vertical-align: -.2em; background: var(--ink); animation: blink 1.1s steps(1) infinite; }
+
+/* ---------- Issue / PR / 差分 ---------- */
+.drawer { width: clamp(380px, 33vw, 480px); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.drawer[hidden] { display: none; }
+.d-head { display: flex; align-items: center; gap: 4px; padding: 12px 12px 0 22px; color: var(--ink2); }
+.d-head .k { flex: 1; font-size: 12px; }
+.d-body { flex: 1; overflow-y: auto; padding: 4px 22px 28px; }
+.doc h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.5; font-weight: 600; }
+.doc h3 { margin: 26px 0 8px; font-size: 12px; font-weight: 600; color: var(--ink2); }
+.doc p { margin: 0 0 8px; } .doc ul { margin: 0 0 8px; padding-left: 20px; }
+.doc code { font: 12px var(--mono); background: var(--band); padding: 1px 4px; border-radius: 3px; }
+.sub { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; color: var(--ink2); font-size: 12px; margin-bottom: 16px; }
+.state { border: 1px solid var(--line); border-radius: 20px; padding: 0 8px; font-weight: 500; color: var(--ink); line-height: 20px; }
+.lab { display: inline-flex; align-items: center; gap: 5px; }
+.lab::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--h) 45% 52%); }
+.cm { border-top: 1px solid var(--line); padding: 12px 0 4px; }
+.cm .who { font-size: 12px; color: var(--ink2); margin-bottom: 4px; }
+.cm .who b { color: var(--ink); font-weight: 600; }
+.cm .loc { font: 11.5px var(--mono); color: var(--ink3); margin-bottom: 4px; }
+.chk { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; }
+.chk .mark { transform: translateY(1px); }
+.chk .n { font: 12px var(--mono); flex: none; }
+.chk .x { color: var(--ink3); font-size: 12px; margin-left: auto; text-align: right; }
+.chk.fail .n, .chk.fail .x { color: var(--bad); }
+.mark.fail svg { color: var(--bad); width: 10px; height: 10px; }
+.mark.ok svg { color: var(--add); width: 10px; height: 10px; }
+.mergebar { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 12px; color: var(--ink2); font-size: 12px; }
+.cmt { display: flex; gap: 10px; padding: 3px 0; font-size: 12.5px; }
+.cmt .mono { color: var(--ink3); font-size: 12px; }
+.empty { padding: 48px 0; color: var(--ink2); }
+.empty p { margin-bottom: 14px; }
+.links { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-left: -6px; }
+.links button { font: 12px var(--mono); padding: 2px 6px; border-radius: 4px; }
+.links button:hover { background: var(--hover); }
+.file { margin-top: 18px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.file-h { display: flex; gap: 10px; padding: 7px 10px; font: 12px var(--mono); background: var(--band); border-bottom: 1px solid var(--line); }
+.file-h span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ad { color: var(--add); } .dl { color: var(--del); }
+.hunk { font: 11.5px/1.7 var(--mono); overflow-x: auto; padding: 4px 0; }
+.hunk .l { white-space: pre; padding: 0 10px; min-width: max-content; }
+.hunk .h { color: var(--ink3); }
+.hunk .pl { background: var(--add-bg); color: var(--add); }
+.hunk .mi { background: var(--del-bg); color: var(--del); }
+
+/* ---------- 画面の切り替え、Issue / PR の全画面、設定 ---------- */
+.main[hidden], .page[hidden], .scrim[hidden] { display: none; }
+.side-foot button[aria-current] { background: var(--sel); color: var(--ink); font-weight: 600; }
+.lctl { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.lctl:empty { display: none; }
+.lctl .in { flex: 1; height: 28px; }
+.row.nomark { grid-template-columns: 0 minmax(0, 1fr) auto; column-gap: 0; }
+.row .br.tx { font-family: var(--ui); font-size: 13px; }
+.row .why .q { color: var(--ink3); }
+.row .ref { display: inline-flex; align-items: center; gap: 3px; }
+.row.rr.unread .why .w { color: var(--need); font-weight: 500; }
+.snav button { display: flex; align-items: center; width: 100%; height: 40px; padding: 0 18px; border-bottom: 1px solid var(--line); color: var(--ink2); }
+.snav button:hover { background: var(--hover); }
+.snav button[aria-current] { background: var(--sel); color: var(--ink); font-weight: 600; }
+
+.page { grid-column: 2 / 4; min-width: 0; min-height: 0; overflow-y: auto; }
+.p-head { display: flex; align-items: center; gap: 6px; max-width: 1080px; padding: 12px 24px 0 32px; color: var(--ink2); font-size: 12px; min-height: 46px; }
+.p-head .k { flex: 1; }
+.p-head .btn { font-size: 13px; margin-left: 6px; }
+.p-body { max-width: 1080px; padding: 4px 32px 56px; }
+.doc { container-type: inline-size; }
+.doc-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.doc-side .links { margin-bottom: 4px; }
+@container (min-width: 760px) {
+  .doc-grid { grid-template-columns: minmax(0, 1fr) 216px; column-gap: 48px; }
+  .doc h2 { font-size: 20px; }
+  .doc-side > h3:first-child { margin-top: 0; }
+}
+.doc .q { color: var(--ink3); }
+.dtabs { display: flex; align-items: center; gap: 2px; margin: 0 0 18px -9px; border-bottom: 1px solid var(--line); }
+.dtabs .sp { flex: 1; }
+.dtabs .btn { height: 26px; font-size: 12px; margin-bottom: 4px; }
+.links.ui button { font: inherit; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.links .num { color: var(--ink3); }
+.in { height: 30px; min-width: 0; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: inherit; font: inherit; }
+.in:focus { outline: none; border-color: var(--ink3); }
+.in.mono { font: 12.5px var(--mono); }
+.in[readonly] { color: var(--ink2); background: var(--band); }
+textarea.in { display: block; width: 100%; height: auto; min-height: 68px; padding: 8px 10px; resize: vertical; line-height: 1.5; }
+.reply { margin-top: 22px; }
+.bar { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.flist { margin: -6px 0 2px; }
+.flist div { display: flex; gap: 10px; padding: 2px 0; font: 12px var(--mono); color: var(--ink2); }
+.flist span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hunk.rv .l { position: relative; padding-left: 28px; }
+.addc { position: absolute; left: 5px; top: 1px; width: 17px; height: 17px; display: grid; place-items: center; border-radius: 4px; background: var(--ink); color: var(--bg); opacity: 0; }
+.hunk.rv .l:hover .addc, .addc:focus-visible { opacity: 1; }
+.lthread { position: sticky; left: 0; padding: 0 12px 12px; margin: 2px 0; background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font: 13px/1.5 var(--ui); white-space: normal; }
+.lthread .cm:first-child { border-top: 0; }
+.lthread .draft { padding-top: 12px; }
+.rvw { margin-bottom: 4px; }
+.rvw > summary { display: inline-flex; align-items: center; }
+.p-head .more > summary { display: inline-flex; align-items: center; }
+.popf { position: absolute; z-index: 20; right: 0; top: calc(100% + 4px); width: 320px; padding: 12px; background: var(--bg); border-radius: 8px; box-shadow: var(--shadow); font-size: 13px; }
+.ck { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ck input { width: 14px; height: 14px; margin: 0; accent-color: var(--ink); flex: none; }
+.ck:has(input:disabled) { color: var(--ink3); }
+
+.scrim { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(22, 26, 24, .36); }
+.dlg { width: min(520px, 100%); max-height: 100%; overflow: auto; padding: 22px 24px 20px; background: var(--bg); border-radius: 12px; box-shadow: var(--shadow); }
+.dlg h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.dlg .lead { color: var(--ink2); margin-bottom: 16px; overflow-wrap: anywhere; }
+.dlg .q, .set .q { color: var(--ink3); font-size: 12px; }
+.fld { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 10px 12px; margin-top: 14px; }
+.fld > label, .fld > .lb { color: var(--ink2); }
+.fld .note { grid-column: 2; margin-top: -4px; color: var(--ink3); font-size: 12px; }
+.seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--band); border-radius: 7px; justify-self: start; }
+.seg button { height: 26px; padding: 0 10px; border-radius: 5px; color: var(--ink2); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); font-weight: 500; box-shadow: 0 0 0 1px var(--line); }
+.dlg-foot { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 22px; }
+.dlg-foot .sp { flex: 1; }
+.btn.danger { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+.btn.danger:hover { background: var(--bad); opacity: .88; }
+.btn.danger:disabled { background: none; border-color: var(--line); color: var(--ink3); opacity: 1; }
+.loss { margin-top: 4px; border: 1px solid var(--line); border-radius: 8px; }
+.loss div { display: flex; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.loss div:first-child { border-top: 0; }
+.loss .v { margin-left: auto; color: var(--ink2); text-align: right; }
+.loss .warn .v { color: var(--bad); font-weight: 500; }
+.confirm { margin-top: 16px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+.set { max-width: 820px; padding-top: 22px; }
+.set h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+.set .lead { margin: 0 0 20px; color: var(--ink2); max-width: 62ch; }
+.srow { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 7px 0; border-top: 1px solid var(--line); }
+.srow:last-of-type { border-bottom: 1px solid var(--line); }
+.srow .nm { display: flex; align-items: center; gap: 8px; width: 150px; flex: none; font-weight: 500; }
+.srow .nm svg { color: var(--ink2); }
+.srow .gr { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .sc { width: 124px; flex: none; }
+.srow .tail { width: 176px; flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.srow .grip { color: var(--ink3); cursor: grab; margin: 0 -4px 0 -4px; }
+.tbtn { padding: 2px 7px; border-radius: 5px; color: var(--ink2); font-size: 12px; white-space: nowrap; }
+.tbtn:hover { background: var(--hover); color: var(--ink); }
+.tbtn.danger { color: var(--bad); }
+.set .add { margin-top: 16px; }
+.edit { margin: 0 -18px; padding: 4px 18px 16px; border: 1px solid var(--ink3); border-radius: 10px; }
+.edit .fld { grid-template-columns: 116px minmax(0, 1fr); }
+.icons { display: flex; flex-wrap: wrap; gap: 2px; }
+.icons button { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; color: var(--ink2); }
+.icons button[aria-pressed="true"] { background: var(--sel); color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips span { padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; font: 12px var(--mono); color: var(--ink2); }
+
+/* ---------- 設定の追加分、最初の起動 ---------- */
+.adiv { width: 1px; height: 16px; margin: 7px 9px; background: var(--line); flex: none; }
+.hb { display: flex; gap: 8px; min-width: 0; }
+.hb .in { flex: 1; }
+.addrow { margin-bottom: 18px; }
+.srow .gr.two { display: flex; flex-direction: column; font-size: 12.5px; line-height: 1.5; }
+.srow .gr.two span { overflow: hidden; text-overflow: ellipsis; }
+.srow .tail .btn { font-size: 12.5px; }
+.set .after { margin: 14px 0 0; max-width: 62ch; }
+.paths { display: grid; grid-template-columns: auto 1fr; gap: 4px 20px; margin-top: 10px; font-size: 12px; color: var(--ink2); }
+.paths span:nth-child(even) { color: var(--ink3); }
+.loss .dt { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--ink2); }
+.dlg p { margin: 0 0 12px; color: var(--ink2); }
+.first { max-width: 560px; padding-top: 14vh; }
+.first h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.first .lead { margin: 0 0 22px; color: var(--ink2); }
+.first .fld { grid-template-columns: 132px minmax(0, 1fr); }
+.first .bar { margin-top: 22px; }
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="side-top">
+    <details class="repo">
+      <summary><span id="reponame"><span class="dim">acme/</span>webapp</span><span class="pip" id="repopip" title="未読があります"></span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></summary>
+      <div class="pop" id="repomenu"></div>
+    </details>
+    <button class="icon-btn" data-new="" title="新しい worktree" aria-label="新しい worktree"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
+  </div>
+  <nav class="nav" aria-label="画面">
+    <button data-screen="wt">worktree</button>
+    <button data-screen="issue">Issue</button>
+    <button data-screen="pr" title="worktree のないレビュー依頼">PR<span class="cnt" id="prcnt"></span><span class="pip" id="prpip"></span></button>
+  </nav>
+  <div class="lctl" id="lctl"></div>
+  <div class="list" id="list" role="listbox" aria-label="worktree"></div>
+  <div class="side-foot">
+    <button data-screen="set"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2"/></svg>設定</button>
+  </div>
+</aside>
+
+<main class="main" id="main">
+  <header class="head">
+    <div class="head-l">
+      <h1 id="title"></h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div id="cta"></div>
+  </header>
+  <div class="acts">
+    <div class="acts-in" id="acts"></div>
+    <button class="icon-btn" data-rset="acme/webapp" title="このリポジトリのボタンを追加" aria-label="このリポジトリのボタンを追加"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
+    <details class="more">
+      <summary class="icon-btn" title="その他" aria-label="その他"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg></summary>
+      <div class="pop right" id="moremenu"></div>
+    </details>
+  </div>
+  <div class="tabs" id="tabs" role="tablist" aria-label="セッション"></div>
+  <div class="term" id="term" role="tabpanel"></div>
+</main>
+
+<aside class="drawer" id="drawer" hidden>
+  <div class="d-head">
+    <span class="k" id="dkind"></span>
+    <button class="icon-btn" title="GitHub で開く" aria-label="GitHub で開く" id="dext"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h3.5v3.5M13 3L7.5 8.5M11.5 9.5v3h-8v-8h3"/></svg></button>
+    <button class="icon-btn" title="閉じる (Esc)" aria-label="閉じる" id="dclose"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+  </div>
+  <div class="d-body" id="dbody"></div>
+</aside>
+
+<section class="page" id="page" hidden>
+  <div class="p-head" id="phead"></div>
+  <div class="p-body" id="pbody"></div>
+</section>
+
+<div class="scrim" id="scrim" hidden><div class="dlg" id="dlg" role="dialog" aria-modal="true"></div></div>
+
+<script>
+'use strict';
+const svg = (d, s) => '<svg width="' + (s || 15) + '" height="' + (s || 15) + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const IC = {
+  folder: '<path d="M1.8 4.5v7.7h12.4V5.6H8.3L6.9 3.8H1.8z"/>',
+  code: '<path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/>',
+  claude: '<path d="M8 2v12M2 8h12M3.8 3.8l8.4 8.4M12.2 3.8l-8.4 8.4"/>',
+  codex: '<path d="M8 1.8l5.4 3.1v6.2L8 14.2l-5.4-3.1V4.9z"/>',
+  agy: '<path d="M8 2.5l5.5 11h-11z"/>',
+  issue: '<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"/>',
+  review: '<path d="M1.6 8S4 3.8 8 3.8 14.4 8 14.4 8 12 12.2 8 12.2 1.6 8 1.6 8z"/><circle cx="8" cy="8" r="1.9"/>',
+  build: '<path d="M9.6 2.6l3.8 3.8-1.9 1.9-3.8-3.8zM8 6.2L2.4 11.8l1.8 1.8L9.8 8"/>',
+  test: '<path d="M6.3 1.8h3.4M6.7 1.8v4.3l-3.9 6.8a.9.9 0 0 0 .8 1.3h8.8a.9.9 0 0 0 .8-1.3L9.3 6.1V1.8M4.6 10.4h6.8"/>',
+  pr: '<circle cx="4" cy="3.6" r="1.5"/><circle cx="4" cy="12.4" r="1.5"/><circle cx="12" cy="12.4" r="1.5"/><path d="M4 5.1v5.8M12 10.9V7a2 2 0 0 0-2-2H8.2M9.6 3.5L8.1 5l1.5 1.5"/>',
+  diff: '<path d="M8 2.5v5M5.5 5h5M5.5 12.5h5"/><rect x="2" y="1.2" width="12" height="13.6" rx="2" stroke-opacity=".0"/>',
+  check: '<path d="M3 8.6l3.1 3.1L13 5"/>',
+  x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+  trash: '<path d="M2.6 4.5h10.8M6 4.5v-2h4v2M4 4.5l.7 9h6.6l.7-9"/>',
+  copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M3 10.5v-7a1 1 0 0 1 1-1h7"/>',
+  dot: '<circle cx="8" cy="8" r="3" fill="currentColor" stroke="none"/>',
+  branch: '<circle cx="4.5" cy="3.6" r="1.5"/><circle cx="4.5" cy="12.4" r="1.5"/><circle cx="11.5" cy="5.6" r="1.5"/><path d="M4.5 5.1v5.8M11.5 7.1c0 2.6-7 1.4-7 3.8"/>',
+  ext: '<path d="M9.5 3h3.5v3.5M13 3L7.5 8.5M11.5 9.5v3h-8v-8h3"/>',
+  grip: '<path d="M6 4v.01M10 4v.01M6 8v.01M10 8v.01M6 12v.01M10 12v.01" stroke-width="1.8"/>',
+  plus: '<path d="M8 3.5v9M3.5 8h9"/>',
+  edit: '<path d="M3 13l.6-2.8 7.2-7.2 2.2 2.2-7.2 7.2z"/>'
+};
+const ic = (k, s) => svg(IC[k], s);
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const L = s => s.replace(/^\n/, '').replace(/\n$/, '').split('\n');
+const TOOL = { claude: 'Claude Code', codex: 'Codex', agy: 'Antigravity' };
+const HUE = { bug: 5, backend: 140, performance: 35, enhancement: 195, frontend: 215, refactor: 265, security: 335, docs: 60, 'good first issue': 280 };
+
+const ACTIONS = [
+  ['folder', 'フォルダを開く'], ['code', 'VS Code'],
+  ['claude', 'Claude Code', 1], ['codex', 'Codex'], ['agy', 'Antigravity'],
+  ['issue', 'Issue を実装', 1, 'issue'], ['review', 'PR をレビュー', 0, 'pr'],
+  ['build', 'ビルド', 'repo'], ['test', 'テスト'] // 'repo' から先はこのリポジトリのボタン
+];
+
+const ISSUES = {
+  214: { title: '検索結果のページネーションが2ページ目で重複する', labels: ['bug', 'backend'], by: 'sato-k', when: '2日前',
+    body: '<p>検索結果の2ページ目に、1ページ目の末尾にあった項目がもう一度出ることがあります。</p><p>再現手順</p><ul><li>「請求」で検索する（スコアが同じ項目が多い）</li><li>2ページ目に進む</li><li>1ページ目の 19〜20 件目と同じ項目が先頭に出る</li></ul><p>期待する動作：どの項目も1回だけ出る。</p>',
+    cm: [['mtanaka', '2日前', '本番でも再現しました。スコアが同点の項目が多い検索語でだけ起きるようです。'], ['hinata', '1日前', '<code>ORDER BY</code> が安定していないのが原因に見えます。調べます。']] },
+  198: { title: 'CSV エクスポートが大きいデータでタイムアウトする', labels: ['bug', 'performance'], by: 'mtanaka', when: '6日前',
+    body: '<p>10万行を超えるデータで CSV エクスポートを実行すると、30秒でタイムアウトして 504 が返ります。</p><p>全行をメモリに載せてから文字列化しているのが原因だと思います。ストリーミングで返すようにしたいです。</p>',
+    cm: [['sato-k', '5日前', '顧客から問い合わせが来ているので優先度高めでお願いします。']] },
+  209: { fresh: 1, title: '設定画面にダークモードの切り替えを追加', labels: ['enhancement', 'frontend'], by: 'hinata', when: '3日前',
+    body: '<p>設定画面の「表示」に、ライト / ダーク / システムに合わせる の3択を追加する。</p><ul><li>選択は <code>localStorage</code> に保存する</li><li>既定は「システムに合わせる」</li></ul><p>色の切り替え方は2案あるので、両方実装して比べる。</p>',
+    cm: [['yuki-h', '2日前', 'デザインは Figma の「Settings / Appearance」にあります。'], ['hinata', '昨日', '案A（CSS 変数を <code>data-theme</code> で切り替え）を #221、案B（<code>light-dark()</code>）を #224 に出しました。']] },
+  187: { title: '通知メールのテンプレートを React Email に移行', labels: ['refactor'], by: 'yuki-h', when: '9日前',
+    body: '<p>Handlebars で書いている通知メール 6 種類を React Email に移行する。プレビューとテストがしやすくなる。</p>',
+    cm: [['mtanaka', '4日前', '件名の文言は変えないでください。フィルタを設定しているユーザーがいます。']] },
+  203: { title: 'ログイン後のリダイレクト先を保持する', labels: ['enhancement', 'security'], by: 'sato-k', when: '5日前',
+    body: '<p>未ログインで <code>/orders/123</code> を開くとログイン画面に飛ぶが、ログイン後にトップへ戻されてしまう。元の URL に戻したい。</p><p>外部 URL へのリダイレクトにならないよう検証が必要。</p>',
+    cm: [['sato-k', '4日前', '<code>//evil.example</code> のような形式も弾いてください。']] },
+  225: { title: 'メンバーを一括で招待できるようにする', labels: ['enhancement'], by: 'yuki-h', when: '4日前',
+    body: '<p>メールアドレスを貼り付けて、最大 100 人まで一度に招待できるようにする。</p>', cm: [] },
+  222: { title: '注文一覧の絞り込み条件を URL に保存する', labels: ['enhancement', 'frontend'], by: 'yuki-h', when: '3時間前',
+    body: '<p>絞り込んだ状態の一覧を URL で共有できるようにしたい。リロードしても条件が残るようにする。</p>', cm: [] },
+  220: { title: 'セッション切れのときにエラー画面ではなくログイン画面へ遷移させる', labels: ['bug'], by: 'mtanaka', when: '昨日',
+    body: '<p>セッションが切れた状態で操作すると「予期しないエラー」と表示される。401 のときはログイン画面に遷移させる。</p>',
+    cm: [['mtanaka', '昨日', '自分で直しました。#231 を見てもらえますか。']] },
+  218: { title: 'Node.js 22 に上げる', labels: ['refactor'], by: 'hinata', when: '2日前',
+    body: '<p>Node.js 20 のサポート終了に備えて 22 に上げる。CI と Dockerfile、<code>.nvmrc</code> を更新する。</p>', cm: [] },
+  216: { title: 'README のセットアップ手順が古い', labels: ['docs', 'good first issue'], by: 'okabe', when: '2日前',
+    body: '<p>README では yarn を使う手順になっているが、いまは pnpm。</p>', cm: [] },
+  201: { title: 'パスワード再設定メールのリンクが 404 になる', labels: ['bug'], by: 'sato-k', when: '10日前', closed: 1,
+    body: '<p>メールのリンクを開くと 404 になる。URL の末尾にピリオドが入っている。</p>', cm: [['sato-k', '9日前', '直っているのを確認しました。']] },
+  192: { title: 'プロフィール画像のアップロードで EXIF の向きを反映', labels: ['bug'], by: 'okabe', when: '12日前', closed: 1,
+    body: '<p>iPhone で縦に撮った写真をプロフィール画像にすると、横向きで表示される。</p>',
+    cm: [['yuki-h', '8日前', '確認しました。直っています。']] }
+};
+
+Object.entries({ 214: 'hinata', 198: 'hinata', 209: 'hinata', 187: 'hinata', 203: 'hinata', 225: 'yuki-h', 222: 'hinata', 220: 'mtanaka', 216: 'okabe', 201: 'hinata', 192: 'hinata' }).forEach(([n, who]) => { ISSUES[n].as = who; });
+
+const OK5 = [['lint', 'ok', ''], ['typecheck', 'ok', ''], ['test (unit)', 'ok', ''], ['test (integration)', 'ok', ''], ['build', 'ok', '']];
+// ev: この PR で対応が残っていること。[表示する文言, 壊れている(1) / 自分の番(0)]
+const PRS = {
+  219: { title: 'CSV エクスポートをストリーミングに変更', by: 'hinata', state: 'Open', ev: [['CI 失敗', 1]],
+    checks: [['lint', 'ok', ''], ['typecheck', 'ok', ''], ['test (unit)', 'ok', ''], ['test (integration)', 'fail', 'export.int.test.ts「10万行をストリームで返す」がタイムアウト'], ['build', 'ok', '']],
+    reviews: [['mtanaka', '依頼中']], threads: [], merge: 'CI が失敗しているためマージできません' },
+  221: { title: 'ダークモードの切り替え（案A：CSS 変数を data-theme で切り替える）', by: 'hinata', state: 'Draft', note: 'Draft',
+    checks: OK5, reviews: [], threads: [], merge: 'Draft のためマージできません。main より 3 コミット遅れています' },
+  224: { title: 'ダークモードの切り替え（案B：light-dark() を使う）', by: 'hinata', state: 'Draft', note: 'CI 実行中',
+    checks: [['lint', 'ok', ''], ['typecheck', 'ok', ''], ['test (unit)', 'run', '実行中'], ['test (integration)', 'run', '実行中'], ['build', 'wait', '待機中']],
+    reviews: [], threads: [], merge: 'Draft のためマージできません' },
+  215: { title: '通知メールを React Email に移行', by: 'hinata', state: 'Open', ev: [['コンフリクト', 1]],
+    checks: OK5, reviews: [['mtanaka', 'Approve']], threads: [], merge: 'main とコンフリクトしています（src/server/mail/send.ts）' },
+  217: { title: 'ログイン後に元のページへ戻す', by: 'hinata', state: 'Open', ev: [['修正を求められた', 0]],
+    checks: OK5, reviews: [['sato-k', 'Changes requested'], ['ai-review[bot]', 'コメント'], ['mtanaka', '依頼中']],
+    threads: [['sato-k', 'src/auth/redirect.ts:4', 'バックスラッシュで始まる形式もブラウザによっては外部扱いになります。テストに足してもらえますか。', 4], ['ai-review[bot]', 'src/auth/redirect.ts:6', '<code>location.origin</code> を直接参照しているので、SSR では例外になります。origin を引数で受け取る形を検討してください。', 5], ['ai-review[bot]', 'src/pages/login.tsx:31', 'next をクエリから取り出すときに <code>decodeURIComponent</code> が二重にかかっています。', 2]],
+    merge: '修正を求められているためマージできません' },
+  226: { title: 'メンバーの一括招待を追加', by: 'yuki-h', state: 'Open', note: 'yuki-h の PR', rr: 1,
+    checks: OK5, reviews: [['hinata', '依頼中']], threads: [], merge: '' },
+  227: { title: '注文一覧の CSV に税率の列を追加', by: 'sato-k', state: 'Open', ev: [['PR が更新された', 0]], rr: 1,
+    checks: OK5, reviews: [['hinata', 'コメント']], threads: [],
+    news: [['9f3b2e1', '税率を 10% の形式で出力する'], ['c81d07a', '税率の列のテストを追加']], merge: '' },
+  229: { title: '注文一覧の絞り込み条件を URL に保存する', by: 'hinata', state: 'Open', note: 'レビュー待ち',
+    checks: OK5, reviews: [['mtanaka', '依頼中']], threads: [], merge: 'Approve が必要です（1 件）' },
+  // worktree のない PR。rr: 自分にレビューが依頼されている
+  231: { title: 'セッション切れのときはログイン画面へ遷移させる', by: 'mtanaka', state: 'Open', note: 'レビュー依頼', rr: 1, unread: 1, issue: 220, branch: 'fix/session-expired-401',
+    checks: OK5, reviews: [['hinata', '依頼中']], threads: [], merge: '',
+    diff: [{ path: 'src/api/client.ts', add: 6, del: 1, lines: L(`
+@@ -31,7 +31,12 @@ export async function request<T>(path: string, init?: RequestInit) {
+   const res = await fetch(BASE + path, withAuth(init));
+-  if (!res.ok) throw new ApiError(res.status);
++  if (res.status === 401) {
++    // セッション切れ。元の場所を覚えてログイン画面へ
++    location.assign("/login?next=" + encodeURIComponent(location.pathname));
++    return new Promise<T>(() => {});
++  }
++  if (!res.ok) throw new ApiError(res.status);
+   return (await res.json()) as T;
+ }`) }] },
+  228: { title: 'README のセットアップ手順を pnpm に更新', by: 'okabe', state: 'Open', note: 'レビュー依頼', rr: 1, issue: 216, branch: 'docs/readme-pnpm',
+    checks: OK5, reviews: [['hinata', '依頼中']], threads: [], merge: '',
+    diff: [{ path: 'README.md', add: 3, del: 3, lines: L(`
+@@ -12,9 +12,9 @@
+ ## セットアップ
+ 
+-yarn install
+-yarn db:migrate
+-yarn dev
++pnpm install
++pnpm db:migrate
++pnpm dev
+ 
+ http://localhost:5173/ を開きます。`) }] },
+  213: { title: '依存パッケージを更新（10月分）', by: 'okabe', state: 'Open', note: 'CI 実行中', branch: 'chore/update-deps-oct',
+    checks: [['lint', 'ok', ''], ['typecheck', 'ok', ''], ['test (unit)', 'run', '実行中'], ['test (integration)', 'run', '実行中'], ['build', 'wait', '待機中']],
+    reviews: [['mtanaka', '依頼中']], threads: [], merge: '',
+    diff: [{ path: 'package.json', add: 3, del: 3, lines: L(`
+@@ -21,9 +21,9 @@
+   "dependencies": {
+-    "drizzle-orm": "^0.33.0",
+-    "react-router-dom": "^6.26.2",
+-    "zod": "^3.23.8"
++    "drizzle-orm": "^0.34.1",
++    "react-router-dom": "^6.27.0",
++    "zod": "^3.23.8"
+   },`) }] },
+  212: { title: 'アップロード時に EXIF の向きを反映する', by: 'hinata', state: 'Merged', note: 'Merged',
+    checks: OK5, reviews: [['yuki-h', 'Approve']], threads: [], merge: 'main にマージされました' }
+};
+
+Object.entries({
+  219: '<p>全行をメモリに載せてから返していたのを、1,000 行ずつ読んで書き出す形に変更しました。</p><p>Closes #198</p>',
+  217: '<p>未ログインで開いた URL を <code>next</code> パラメータで保持し、ログイン後にそこへ戻します。同一オリジンのパスだけを受け付けます。</p><p>Closes #203</p>',
+  215: '<p>通知メール 6 種類を Handlebars から React Email に移行しました。件名は変えていません。</p><p>Closes #187</p>',
+  227: '<p>経理から要望のあった税率の列を、注文一覧の CSV に追加します。</p>',
+  231: '<p>API が 401 を返したら、いまの場所を <code>next</code> に入れてログイン画面へ遷移させます。</p><p>Closes #220</p>',
+  228: '<p>yarn の手順を pnpm に直しました。</p><p>Closes #216</p>',
+  213: '<p>月次の依存パッケージ更新です。メジャーバージョンの更新はありません。</p>'
+}).forEach(([n, body]) => { PRS[n].body = body; });
+
+const dev = (dir, port, file) => L(`
+$|${dir} $ pnpm dev
+r|
+r|  VITE v5.4.8  ready in 412 ms
+r|
+r|  ➜  Local:   http://localhost:${port}/
+r|  ➜  Network: use --host to expose
+dm|14:02:11 [vite] hmr update /${file}
+dm|14:06:48 [vite] hmr update /${file}`);
+const P = '~/github-mate/acme/webapp/worktrees/';
+
+const WTS = [
+  { branch: 'main', grp: 'main', why: 'リポジトリ本体', path: '~/github-mate/acme/webapp/repo',
+    sess: [{ name: 'zsh', term: L(`
+$|~/github-mate/acme/webapp/repo $ git pull --ff-only
+r|Updating 3e1f0aa..9b7c2d4
+r|Fast-forward
+r| src/server/upload/avatar.ts | 1 +
+r| 1 file changed, 1 insertion(+)
+$|~/github-mate/acme/webapp/repo $ git worktree list
+r|~/github-mate/acme/webapp/repo                                         9b7c2d4 [main]
+r|~/github-mate/acme/webapp/worktrees/fix-214-search-pagination-dup  9b7c2d4 [fix/214-search-pagination-dup]
+r|~/github-mate/acme/webapp/worktrees/fix-198-csv-export-timeout     7be03d1 [fix/198-csv-export-timeout]
+dm|  （以下 8 件）
+$|~/github-mate/acme/webapp/repo $ ^`) }],
+    diff: [] },
+
+  { branch: 'fix/214-search-pagination-dup', issue: 214, dirty: 2,
+    sess: [
+      { tool: 'claude', title: '#214 を実装', st: 'wait', term: L(`
+u|> https://github.com/acme/webapp/issues/214 を実装して
+a|検索 API のページネーション処理を確認します。
+t|Read(src/server/search/query.ts)
+o|142 行を読み込み
+t|Bash(pnpm vitest run src/server/search)
+o|Test Files  3 passed (3)   Tests  12 passed (12)
+a|原因が分かりました。ORDER BY score DESC だけだと同点の行の順序が決まらず、OFFSET の境界で同じ行が2回返ります。id を第2ソートキーに追加します。
+t|Update(src/server/search/query.ts)
+m|47 -    .orderBy(desc(items.score))
+p|47 +    .orderBy(desc(items.score), asc(items.id))
+t|Write(src/server/search/query.test.ts)
+o|同点スコア 40 件で 1〜2 ページを取得する再現テストを追加（+9 行）
+t|Bash(pnpm vitest run src/server/search)
+o|Test Files  3 passed (3)   Tests  13 passed (13)
+a|修正しました。同点スコアの行が 2 ページにまたがっても重複しないことをテストで確認しています。
+a|dev サーバー（http://localhost:5174/）で「請求」を検索して、2 ページ目を確認してください。問題なければコミットして PR を作成します。`) },
+      { tool: 'claude', title: 'E2E テストを追加', st: 'run', term: L(`
+u|> 検索結果のページ送りの E2E テストを Playwright で追加して。同点スコアのデータで 3 ページ分
+a|既存の E2E テストの構成を確認します。
+t|Read(e2e/search.spec.ts)
+o|58 行を読み込み
+t|Write(e2e/fixtures/same-score.ts)
+o|+22 行
+t|Update(e2e/search.spec.ts)
+o|+31 行
+t|Bash(pnpm playwright test e2e/search.spec.ts)
+s|Running…  48s  ↓ 2.1k tokens  esc で中断`) },
+      { name: 'pnpm dev', term: dev(P + 'fix-214-search-pagination-dup', 5174, 'src/server/search/query.ts') }],
+    diff: [
+      { path: 'src/server/search/query.ts', add: 2, del: 1, lines: L(`
+@@ -44,7 +44,8 @@ export async function searchItems(q: SearchQuery) {
+     .select()
+     .from(items)
+     .where(matchQuery(q.text))
+-    .orderBy(desc(items.score))
++    // 同点の行の順序を固定する（#214）
++    .orderBy(desc(items.score), asc(items.id))
+     .limit(q.pageSize)
+     .offset((q.page - 1) * q.pageSize);`) },
+      { path: 'src/server/search/query.test.ts', add: 9, del: 0, lines: L(`
+@@ -88,3 +88,12 @@ describe("searchItems", () => {
+     expect(res.items).toHaveLength(20);
+   });
++
++  it("同点スコアでもページ間で重複しない", async () => {
++    await seedItems(40, { score: 1 });
++    const p1 = await searchItems({ text: "請求", page: 1, pageSize: 20 });
++    const p2 = await searchItems({ text: "請求", page: 2, pageSize: 20 });
++    const ids = [...p1.items, ...p2.items].map((i) => i.id);
++    expect(new Set(ids).size).toBe(40);
++  });
+ });`) }] },
+
+  { branch: 'fix/198-csv-export-timeout', issue: 198, pr: 219,
+    sess: [
+      { tool: 'claude', title: '#198 を実装', st: 'done', term: L(`
+u|> コミットして PR を作成して
+t|Bash(git commit -am "CSV をストリームで書き出す")
+o|[fix/198-csv-export-timeout a41c9e2] CSV をストリームで書き出す
+t|Bash(git push -u origin fix/198-csv-export-timeout)
+o|branch 'fix/198-csv-export-timeout' set up to track 'origin/fix/198-csv-export-timeout'.
+t|Bash(gh pr create --fill)
+o|https://github.com/acme/webapp/pull/219
+a|PR #219 を作成しました。CI の結果が出たら確認してください。`) },
+      { name: 'pnpm test --watch', term: L(`
+$|${P}fix-198-csv-export-timeout $ pnpm test --watch
+r|
+r| ✓ src/server/export/csv.test.ts (6)
+r| ✓ src/server/export/columns.test.ts (4)
+r|
+r| Test Files  2 passed (2)
+r|      Tests  10 passed (10)
+r|
+dm| PASS  Waiting for file changes...
+dm|       press h to show help, press q to quit`) }],
+    diff: [{ path: 'src/server/export/csv.ts', add: 10, del: 3, lines: L(`
+@@ -22,6 +22,13 @@ export async function exportCsv(res: Response, filter: Filter) {
+-  const rows = await db.select().from(orders).where(toWhere(filter));
+-  res.setHeader("Content-Type", "text/csv");
+-  res.send(toCsv(rows));
++  res.setHeader("Content-Type", "text/csv; charset=utf-8");
++  res.write(BOM + header.join(",") + EOL);
++  let cursor: number | undefined;
++  for (;;) {
++    const rows = await fetchBatch(filter, cursor, BATCH);
++    if (rows.length === 0) break;
++    res.write(rows.map(toLine).join(EOL) + EOL);
++    cursor = rows[rows.length - 1].id;
++  }
++  res.end();
+ }`) }] },
+
+  { branch: 'feat/203-keep-redirect', issue: 203, pr: 217, unread: 1, prNew: 1,
+    sess: [
+      { tool: 'claude', title: '#203 を実装', st: 'done', term: L(`
+u|> https://github.com/acme/webapp/issues/203 を実装して。外部 URL に飛ばないように検証も入れて
+a|ログイン処理とルーティングのガードを確認します。
+t|Read(src/pages/login.tsx)
+o|74 行を読み込み
+t|Write(src/auth/redirect.ts)
+o|+14 行
+t|Update(src/pages/login.tsx)
+o|+6 行、−1 行
+t|Bash(pnpm vitest run src/auth)
+o|Tests  9 passed (9)
+a|next パラメータを保持し、同一オリジンのパスだけを受け付けるようにしました。//evil.example の形式も弾いています。
+t|Bash(gh pr create --fill)
+o|https://github.com/acme/webapp/pull/217`) },
+      { name: 'ビルド', btn: 1, st: 'ok', term: L(`
+$|${P}feat-203-keep-redirect $ pnpm build
+r|
+r|vite v5.4.8 building for production...
+r|✓ 1284 modules transformed.
+r|dist/index.html                   0.62 kB │ gzip:   0.38 kB
+r|dist/assets/index-C3kq0x1Z.css   48.17 kB │ gzip:   9.02 kB
+r|dist/assets/index-BqT7a9dL.js   612.40 kB │ gzip: 187.33 kB
+r|✓ built in 6.41s
+dm|
+dm|終了コード 0`) },
+      { name: 'pnpm dev', term: dev(P + 'feat-203-keep-redirect', 5175, 'src/auth/redirect.ts') }],
+    diff: [{ path: 'src/auth/redirect.ts', add: 8, del: 0, lines: L(`
+@@ -0,0 +1,8 @@
++export function safeNext(next: string | null): string {
++  if (!next) return "/";
++  // 同一オリジンのパスだけを許可する
++  if (!next.startsWith("/") || next.startsWith("//")) return "/";
++  const url = new URL(next, location.origin);
++  if (url.origin !== location.origin) return "/";
++  return url.pathname + url.search;
++}`) },
+      { path: 'src/pages/login.tsx', add: 2, del: 1, lines: L(`
+@@ -28,6 +28,7 @@ export function LoginPage() {
+   const [params] = useSearchParams();
++  const next = decodeURIComponent(params.get("next") ?? "");
+   const onSuccess = () => {
+-    navigate("/");
++    navigate(safeNext(next));
+   };`) }] },
+
+  { branch: 'refactor/187-react-email', issue: 187, pr: 215,
+    sess: [
+      { tool: 'claude', title: '#187 を実装', st: 'done', term: L(`
+u|> 残りのパスワード再設定メールも移行して、件名は変えないで
+t|Write(src/emails/PasswordReset.tsx)
+o|+41 行
+t|Update(src/server/mail/send.ts)
+o|+3 行、−9 行
+t|Bash(pnpm vitest run src/emails)
+o|Tests  18 passed (18)
+a|6 種類すべての移行が終わりました。件名はスナップショットテストで元の文言と一致することを確認しています。
+t|Bash(git commit -am "パスワード再設定メールを移行" && git push)
+o|3f8a6c0..e7715bd  refactor/187-react-email -> refactor/187-react-email`) },
+      { tool: 'codex', title: 'PR #215 をレビュー', st: 'done', term: L(`
+u|› PR #215 をレビューして
+a|main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|19 files changed, 388 insertions(+), 301 deletions(-)
+t|Ran pnpm vitest run src/emails
+o|Tests  18 passed (18)
+a|要修正の点はありません。提案が 1 件あります。
+a|  1. [提案] emails/Layout.tsx:12  フッターの年が固定値になっている。new Date().getFullYear() にしたほうがよい。`) }],
+    diff: [{ path: 'src/server/mail/send.ts', add: 3, del: 9, lines: L(`
+@@ -18,15 +18,9 @@ export async function sendMail(kind: MailKind, to: string, data: MailData) {
+-  const source = await readFile(templatePath(kind), "utf8");
+-  const html = Handlebars.compile(source)(data);
+-  const subject = SUBJECTS[kind](data);
++  const Template = TEMPLATES[kind];
++  const html = await render(<Template {...data} />);
++  const subject = SUBJECTS[kind](data);
+   await transport.sendMail({ to, subject, html });`) }] },
+
+  { branch: 'feat/orders-csv-tax-rate', pr: 227, unread: 1, prNew: 1,
+    sess: [
+      { tool: 'codex', title: 'PR #227 をレビュー', st: 'done', term: L(`
+u|› PR #227 をレビューして
+a|main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|1 file changed, 1 insertion(+)
+a|見つかった点
+a|  1. [要修正] columns.ts:16  税率が 0.1 のような小数のまま出力される。ほかの列に合わせて 10% の形式にしたほうがよい。
+a|  2. [提案] 税率の列のテストがない。`) }],
+    diff: [{ path: 'src/server/export/columns.ts', add: 1, del: 0, lines: L(`
+@@ -14,6 +14,7 @@ export const ORDER_COLUMNS = [
+   { key: "subtotal", label: "小計" },
++  { key: "taxRate", label: "税率", format: percent },
+   { key: "tax", label: "消費税" },
+   { key: "total", label: "合計" },
+ ];`) }] },
+
+  { branch: 'feat/209-dark-mode-css-vars', issue: 209, pr: 221, dirty: 4, unpushed: 1,
+    sess: [
+      { tool: 'claude', title: '#209 を実装（案A）', st: 'run', term: L(`
+u|> 色を直接書いているコンポーネントを CSS 変数に置き換えて
+a|ThemeProvider は追加済みなので、既存コンポーネントの置き換えに取りかかります。
+t|Bash(rg "#[0-9a-f]{6}" src/components --files-with-matches)
+o|14 ファイル
+t|Update(src/styles/tokens.css)
+o|+26 行、−4 行
+t|Bash(pnpm tsc --noEmit)
+o|エラーなし
+a|14 ファイル中 9 ファイルを置き換えました。残りを続けます。
+t|Update(src/components/Card.tsx)
+o|+2 行、−2 行
+t|Update(src/components/Modal.tsx)
+s|Editing…  2m 14s  ↓ 6.8k tokens  esc で中断`) },
+      { tool: 'codex', title: 'PR #221 をレビュー', st: 'run', term: L(`
+u|› PR #221 をレビューして
+a|main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|17 files changed, 96 insertions(+), 41 deletions(-)
+a|これまでに見つかった点
+a|  1. [要修正] tokens.css:9  ダーク側に --text-muted の定義がない。ライトの値がそのまま使われ、コントラストが足りない。
+a|  2. [提案] ThemeProvider.tsx:18  初回描画の前に data-theme を付けていないので、リロード時に一瞬ライトで表示される。
+t|Read src/components/Modal.tsx
+s|Working  52s  esc で中断`) },
+      { name: 'pnpm dev', term: dev(P + 'feat-209-dark-mode-css-vars', 5176, 'src/styles/tokens.css') }],
+    diff: [
+      { path: 'src/styles/tokens.css', add: 5, del: 0, lines: L(`
+@@ -6,3 +6,8 @@
+   --surface: #ffffff;
+   --line: #e2e5ea;
+ }
++
++[data-theme="dark"] {
++  --surface: #1c2028;
++  --line: #313846;
++}`) },
+      { path: 'src/components/Card.tsx', add: 2, del: 2, lines: L(`
+@@ -8,8 +8,8 @@ const card = css({
+   borderRadius: 8,
+-  background: "#ffffff",
+-  border: "1px solid #e2e5ea",
++  background: "var(--surface)",
++  border: "1px solid var(--line)",
+   padding: 16,
+ });`) }] },
+
+  { branch: 'feat/225-bulk-invite', issue: 225, pr: 226,
+    sess: [
+      { tool: 'codex', title: 'PR #226 をレビュー', st: 'run', term: L(`
+u|› PR #226 をレビューして
+a|main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|7 files changed, 212 insertions(+), 18 deletions(-)
+t|Read src/server/invite/bulk.ts
+a|これまでに見つかった点
+a|  1. [要修正] bulk.ts:41  重複を除く前に上限 100 件を確認している。重複込みで 101 件あると、実際は 100 件以下でも拒否される。
+a|  2. [要修正] bulk.ts:58  招待の INSERT をループの中で 1 件ずつ実行していて、トランザクションがない。途中で失敗すると一部だけ送信済みになる。
+a|  3. [提案] BulkInviteDialog.tsx:22  貼り付けた文字列を改行だけで分割している。カンマ区切りも受け付けたほうがよい。
+t|Ran pnpm vitest run src/server/invite
+o|Tests  6 passed (6)
+a|テストは通っていますが、上限超過と重複のケースがありません。残りのファイルを確認します。
+s|Working  1m 37s  esc で中断`) },
+      { name: 'pnpm dev', term: dev(P + 'feat-225-bulk-invite', 5177, 'src/features/members/BulkInviteDialog.tsx') }],
+    diff: [{ path: 'src/server/invite/bulk.ts', add: 9, del: 0, lines: L(`
+@@ -36,3 +36,12 @@ export async function bulkInvite(teamId: string, raw: string[]) {
+   const team = await getTeam(teamId);
++  if (raw.length > MAX_INVITES) {
++    throw new BadRequest("一度に招待できるのは 100 人までです");
++  }
++  const emails = [...new Set(raw.map(normalize))];
++  for (const email of emails) {
++    await db.insert(invites).values({ teamId, email });
++    await sendInvite(team, email);
++  }
++  return { invited: emails.length };
+ }`) }] },
+
+  { branch: 'spike/virtual-list', unread: 1, dirty: 3,
+    sess: [
+      { tool: 'claude', title: '仮想スクロールを試す', st: 'wait', unread: 1, term: L(`
+u|> 注文一覧を @tanstack/react-virtual で仮想スクロールにしたらどれくらい速くなるか試して。5,000 行で計測して
+a|現在の一覧の実装と、行の高さが固定かどうかを確認します。
+t|Read(src/features/orders/OrderTable.tsx)
+o|211 行を読み込み
+t|Bash(pnpm add @tanstack/react-virtual)
+o|+ @tanstack/react-virtual 3.10.8
+t|Update(src/features/orders/OrderTable.tsx)
+o|+38 行、−12 行
+a|行の高さは 44px 固定だったので estimateSize は定数にしました。5,000 行のデータで描画時間を計測します。
+t|Bash(pnpm vitest bench src/features/orders)
+o|OrderTable 5,000 行  変更前 412 ms  変更後 31 ms
+a|5,000 行の初回描画は 412 ms から 31 ms になりました。スクロール中のフレーム落ちも出ていません。
+a|ただし行を position: absolute で並べる形に変えたので、行数を数えている既存のテストは書き直しが必要です。このまま進めてよければ、テストの修正と行の選択状態の対応を続けます。`) },
+      { name: 'テスト', btn: 1, st: 'fail', unread: 1, term: L(`
+$|${P}spike-virtual-list $ pnpm test
+r|
+r| ✓ src/features/orders/useOrderFilter.test.ts (11)
+r| ❯ src/features/orders/OrderTable.test.tsx (7)
+r|   ✓ 見出しを表示する
+e|   × 5,000 行をすべて描画する
+e|   × 行をクリックすると選択される
+r|
+e| FAIL  src/features/orders/OrderTable.test.tsx > 5,000 行をすべて描画する
+e|AssertionError: expected 12 to be 5000
+r| ❯ src/features/orders/OrderTable.test.tsx:41:42
+r|
+r| Test Files  1 failed | 37 passed (38)
+r|      Tests  2 failed | 214 passed (216)
+e| ELIFECYCLE  Test failed. See above for more details.
+dm|
+dm|終了コード 1`) }],
+    diff: [{ path: 'src/features/orders/OrderTable.tsx', add: 6, del: 2, lines: L(`
+@@ -52,8 +52,12 @@ export function OrderTable({ rows }: Props) {
+-  return (
+-    <tbody>{rows.map((r) => <OrderRow key={r.id} row={r} />)}</tbody>
++  const v = useVirtualizer({
++    count: rows.length,
++    getScrollElement: () => scrollRef.current,
++    estimateSize: () => 44,
++  });
++  return (
++    <tbody style={{ height: v.getTotalSize() }}>{v.getVirtualItems().map(renderRow)}</tbody>
+   );`) }] },
+
+  { branch: 'feat/209-dark-mode-light-dark', grp: 'wait', why: 'CI 実行中', issue: 209, pr: 224,
+    sess: [
+      { tool: 'claude', title: '#209 を実装（案B）', st: 'done', term: L(`
+u|> Issue #209 を light-dark() を使う方法で実装して、Draft の PR を作って
+a|color-scheme と light-dark() で色を定義し、data-theme で color-scheme だけを切り替える形にします。
+t|Update(src/styles/tokens.css)
+o|+6 行、−2 行
+t|Write(src/features/settings/AppearanceSection.tsx)
+o|+24 行
+t|Bash(pnpm vitest run src/features/settings)
+o|Tests  5 passed (5)
+t|Bash(gh pr create --draft --fill)
+o|https://github.com/acme/webapp/pull/224
+a|Draft の PR #224 を作成しました。案A（#221）と比べると変更は 3 ファイルで済みますが、light-dark() は Safari 17.5 未満で使えません。`) },
+      { name: 'pnpm dev', term: dev(P + 'feat-209-dark-mode-light-dark', 5178, 'src/styles/tokens.css') }],
+    diff: [{ path: 'src/styles/tokens.css', add: 5, del: 2, lines: L(`
+@@ -4,5 +4,8 @@
+ :root {
+-  --surface: #ffffff;
+-  --line: #e2e5ea;
++  color-scheme: light dark;
++  --surface: light-dark(#ffffff, #1c2028);
++  --line: light-dark(#e2e5ea, #313846);
+ }
++:root[data-theme="light"] { color-scheme: light; }
++:root[data-theme="dark"] { color-scheme: dark; }`) }] },
+
+  { branch: 'feat/222-orders-filter-url', issue: 222, pr: 229, unread: 1,
+    sess: [
+      { tool: 'claude', title: '#222 を実装', st: 'done', term: L(`
+u|> https://github.com/acme/webapp/issues/222 を実装して
+a|注文一覧の絞り込みの状態がどこで管理されているか確認します。
+t|Read(src/features/orders/useOrderFilter.ts)
+o|63 行を読み込み
+t|Update(src/features/orders/useOrderFilter.ts)
+o|+19 行、−7 行
+t|Bash(pnpm vitest run src/features/orders)
+o|Tests  11 passed (11)
+a|useState を URL のクエリと同期する形に置き換えました。リロードしても条件が残ります。
+t|Bash(gh pr create --fill)
+o|https://github.com/acme/webapp/pull/229`) },
+      { tool: 'codex', title: 'PR #229 をレビュー', st: 'err', unread: 1, term: L(`
+u|› PR #229 をレビューして
+a|main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|3 files changed, 44 insertions(+), 12 deletions(-)
+t|Read src/features/orders/useOrderFilter.ts
+e|■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro) or try again at 18:42.
+dm|
+dm|Codex は終了コード 1 で終了しました`) }],
+    diff: [{ path: 'src/features/orders/useOrderFilter.ts', add: 5, del: 2, lines: L(`
+@@ -12,7 +12,10 @@ export function useOrderFilter() {
+-  const [filter, setFilter] = useState<OrderFilter>(DEFAULT_FILTER);
+-  return { filter, setFilter };
++  const [params, setParams] = useSearchParams();
++  const filter = useMemo(() => parseFilter(params), [params]);
++  const setFilter = (next: OrderFilter) =>
++    setParams(toParams(next), { replace: true });
++  return { filter, setFilter };
+ }`) }] },
+
+  { branch: 'fix/192-exif-orientation', grp: 'done', why: 'マージ済み', issue: 192, pr: 212,
+    sess: [
+      { name: 'zsh', term: L(`
+$|${P}fix-192-exif-orientation $ git status -sb
+r|## fix/192-exif-orientation...origin/fix/192-exif-orientation
+$|${P}fix-192-exif-orientation $ gh pr view 212 --json state -q .state
+r|MERGED
+$|${P}fix-192-exif-orientation $ ^`) }],
+    diff: [] }
+];
+WTS.forEach(w => { w.path = w.path || P + w.branch.replace(/\//g, '-'); });
+
+/* ================= 表示 ================= */
+const ME = 'hinata';
+const S = { screen: 'wt', sel: 0, sess: {}, drawer: null, issue: 220, pr: 228, prTab: 'conv', isState: 'open', isQ: '', draft: null, set: 'gen', rrepo: 'acme/webapp', edit: { set: 5, rset: -1 }, editKind: null, dlg: null };
+const $ = id => document.getElementById(id);
+const GROUPS = [['need', '対応が必要'], ['run', 'AI 実行中'], ['wait', '結果待ち'], ['done', '完了']];
+const mark = k => '<span class="mark ' + k + '">' + (k === 'done' || k === 'ok' ? ic('check', 10) : k === 'fail' ? ic('x', 10) : '') + '</span>';
+const br = b => { const i = b.indexOf('/'); return i < 0 ? esc(b) : '<i>' + esc(b.slice(0, i + 1)) + '</i>' + esc(b.slice(i + 1)); };
+const stat = d => { let a = 0, m = 0; d.forEach(f => { a += f.add; m += f.del; }); return [a, m]; };
+
+/* 状態（何が残っているか）と未読は別に持つ。
+   状態はセッションと PR から導く。未読は worktree（一覧の行）、セッション（タブ）、PR / Issue（ヘッダーのリンク）ごとのフラグ。 */
+const ATT = { err: ['異常終了', 1], fail: ['失敗', 1], wait: ['指示待ち', 0] };
+// 残っている理由を優先度順に返す。壊れている(0) > AI が指示待ち(1) > PR のイベント(2)
+const reasons = w => {
+  const r = [];
+  w.sess.forEach(s => {
+    if (s.st === 'err') r.push({ t: TOOL[s.tool] + ' が異常終了', bad: 1, p: 0 });
+    else if (s.st === 'fail') r.push({ t: s.name + '失敗', bad: 1, p: 0 });
+    else if (s.st === 'wait') r.push({ t: TOOL[s.tool] + ' が指示待ち', bad: 0, p: 1 });
+  });
+  ((w.pr && PRS[w.pr].ev) || []).forEach(e => r.push({ t: e[0], bad: e[1], p: e[1] ? 0 : 2 }));
+  return r.sort((a, b) => a.p - b.p);
+};
+const running = w => w.sess.filter(s => s.tool && s.st === 'run');
+const group = w => reasons(w).length ? 'need' : running(w).length ? 'run' : w.grp;
+WTS.forEach(w => { const r = reasons(w)[0]; w.ord = r ? (w.unread ? 0 : 10) + r.p : 0; });
+const tone = (unread, bad) => (unread ? 'need' : 'seen') + (bad ? ' bad' : '');
+
+function renderList() {
+  let h = '';
+  const row = (w, i) => {
+    const g = group(w), rs = reasons(w), run = running(w), pr = w.pr && PRS[w.pr];
+    const quiet = g === 'wait' || g === 'done' || g === 'main';
+    let why = w.why || '';
+    if (g === 'need') {
+      why = rs[0].t +
+        (rs.length > 1 ? '<span class="more" title="' + rs.slice(1).map(r => r.t).join('、') + '">+' + (rs.length - 1) + '</span>' : '') +
+        (run.length ? '<span class="mark run" title="ほかに実行中のセッションが ' + run.length + ' 件"></span>' : '');
+    } else if (g === 'run') why = [...new Set(run.map(s => TOOL[s.tool]))].join('、') + ' 実行中';
+    return '<button class="row ' + g + (g === 'need' ? (w.unread ? ' unread' : '') + (rs[0].bad ? ' bad' : '') : '') + (quiet ? ' quiet' : '') +
+      '" role="option" aria-selected="' + (i === S.sel) + '" data-wt="' + i + '">' +
+      (g === 'main' ? '<span></span>' : mark(g === 'need' ? tone(w.unread, rs[0].bad) : g)) +
+      '<span class="br">' + br(w.branch) + '</span>' +
+      '<span class="why">' + why + '</span><span class="ref">' + (pr ? '#' + w.pr + (pr.by !== ME ? ' ' + pr.by : '') : '') + '</span>' +
+      (g === 'main' ? '' : '<span class="del" role="button" tabindex="0" data-del="' + i + '" title="worktree を削除" aria-label="worktree を削除">' + ic('trash') + '</span>') +
+      '</button>';
+  };
+  h += row(WTS[0], 0);
+  let unread = 0, need = 0;
+  GROUPS.forEach(([g, name]) => {
+    const items = WTS.map((w, i) => [w, i]).filter(x => group(x[0]) === g);
+    if (!items.length) return;
+    let un = '';
+    if (g === 'need') {
+      // 未読を先に、その中では優先度順。並び順はイベントが届いたときに決まり、既読にしただけでは行は動かない
+      items.sort((a, b) => a[0].ord - b[0].ord);
+      need = items.length; unread = items.filter(x => x[0].unread).length;
+      if (unread) un = '<span class="un">未読 ' + unread + '</span>';
+    }
+    h += '<div class="grp ' + g + '"><span>' + name + '</span><span>' + items.length + '</span>' + un + '</div>';
+    items.forEach(x => { h += row(x[0], x[1]); });
+  });
+  $('list').innerHTML = h;
+  const end = (n, u) => u ? '<span class="end need">未読 ' + u + '</span>' : n ? '<span class="end">対応が必要 ' + n + '</span>' : '';
+  $('repomenu').innerHTML = '<button><span>acme/webapp</span>' + end(need, unread) + '</button>' +
+    '<button><span>acme/api-server</span>' + end(2, 0) + '</button><button><span>hinata/dotfiles</span></button><hr><button data-rset="acme/webapp">このリポジトリの設定…</button><button data-set="repo">リポジトリを追加…</button>';
+  $('repopip').hidden = !unread;
+}
+
+function renderMain() {
+  const w = WTS[S.sel], is = w.issue && ISSUES[w.issue], pr = w.pr && PRS[w.pr], g = group(w);
+  $('title').innerHTML = br(w.branch);
+  const [a, d] = stat(w.diff);
+  const mb = (k, cls, inner) => '<button class="' + cls + '" data-open="' + k + '" aria-expanded="' + (S.drawer === k) + '">' + inner + '</button>';
+  let prl = '';
+  if (pr) {
+    const ev = pr.ev || [], bad = ev.length && ev[0][1];
+    const note = ev.length ? ev[0][0] + (ev.length > 1 ? ' +' + (ev.length - 1) : '') : pr.note;
+    prl = ic('pr', 14) + '<span class="num">#' + w.pr + '</span>' +
+      (w.prNew ? '<span class="pip' + (bad ? ' bad' : '') + '" title="未読"></span>' : '') +
+      '<span class="' + (!ev.length ? '' : w.prNew ? (bad ? 'bad' : 'need') : 'on') + '">' + note + '</span>';
+  }
+  $('meta').innerHTML =
+    (is ? mb('issue', '', ic('issue', 14) + '<span><span class="num">#' + w.issue + '</span> ' + esc(is.title) + '</span>' + (is.fresh ? '<span class="pip" title="新しいコメント"></span>' : ''))
+        : mb('issue', 'none', ic('issue', 14) + '<span>Issue なし</span>')) +
+    (pr ? mb('pr', '', prl) : mb('pr', 'none', ic('pr', 14) + '<span>PR なし</span>')) +
+    (w.diff.length ? mb('diff', '', '<span>差分</span><span class="num"><span class="ad">+' + a + '</span> <span class="dl">−' + d + '</span></span>' + (w.dirty ? '<span class="dim">未コミット ' + w.dirty + '</span>' : ''))
+        : mb('diff', 'none', '<span>差分なし</span>'));
+  $('cta').innerHTML = pr && pr.can ? '<button class="btn primary">マージ</button>'
+    : g === 'done' ? '<button class="btn" data-del="sel">worktree を削除</button>' : '';
+
+  const off = k => (k === 'issue' && !is) || (k === 'pr' && !pr);
+  $('acts').innerHTML = ACTIONS.map(x => (x[2] === 'repo' ? '<span class="adiv"></span>' : '') + '<button class="act' + (x[2] === 1 ? ' gap' : '') + '"' + (off(x[3]) ? ' disabled' : '') + '>' + ic(x[0]) + x[1] + '</button>').join('').replace('act gap', 'act');
+  $('moremenu').innerHTML = ACTIONS.map(x => (x[2] === 'repo' ? '<hr>' : '') + '<button' + (off(x[3]) ? ' disabled' : '') + '>' + ic(x[0]) + x[1] + '</button>').join('') +
+    '<hr><button data-set="btn">' + ic('edit') + 'ボタンを編集…</button><button data-rset="acme/webapp">' + ic('edit') + 'このリポジトリのボタンを編集…</button>' +
+    '<button data-mk="1"' + (g === 'need' && !w.unread ? '' : ' disabled') + '>' + ic('dot') + '未読に戻す</button>' +
+    '<button>' + ic('copy') + 'パスをコピー</button><hr>' +
+    (g === 'main' ? '<button disabled>' + ic('trash') + 'main は削除できません</button>'
+      : '<button class="danger" data-del="sel">' + ic('trash') + 'worktree を削除</button>');
+
+  const cur = S.sess[S.sel];
+  $('tabs').innerHTML = w.sess.map((s, i) => {
+    const at = ATT[s.st];
+    const st = at ? mark(tone(s.unread, at[1])) : s.st === 'run' ? mark('run') : '';
+    const tail = at ? '<span class="st ' + (s.unread ? (at[1] ? 'bad' : 'need') : 'on') + '">' + at[0] + '</span>'
+      : s.st === 'done' ? '<span class="st">終了</span>' : s.st === 'ok' ? '<span class="st">完了</span>' : '';
+    return '<button class="tab" role="tab" aria-selected="' + (i === cur) + '" data-sess="' + i + '">' + st +
+      (s.tool ? '<b>' + TOOL[s.tool] + '</b><span class="t">' + esc(s.title) + '</span>' : '<b' + (s.btn ? '' : ' class="mono"') + '>' + esc(s.name) + '</b>') + tail + '</button>';
+  }).join('');
+
+  const s = w.sess[cur];
+  let t = s.term.map(l => {
+    const i = l.indexOf('|'), k = l.slice(0, i), x = l.slice(i + 1);
+    if (k === '$') { const j = x.indexOf(' $ '); return '<div class="sh"><b>' + esc(x.slice(0, j + 2)) + '</b>' + esc(x.slice(j + 2)).replace('^', '<span class="cur"></span>') + '</div>'; }
+    if (k === 's') return '<div class="s">' + mark('run') + '<span>' + esc(x) + '</span></div>';
+    return '<div class="' + k + '">' + esc(x) + '</div>';
+  }).join('');
+  if (s.tool) {
+    const p = s.tool === 'codex' ? '›' : '>';
+    t += s.st === 'wait' ? '<div class="box live">' + p + ' <span class="cur"></span></div>'
+      : s.st === 'run' ? '<div class="box">' + p + ' </div>'
+      : s.st === 'done' ? '<div class="dm">&nbsp;</div><div class="dm">セッションを終了しました</div>' : '';
+  }
+  const el = $('term'); el.innerHTML = t; el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- Issue / PR / 差分：worktree 画面のパネルと全画面で同じ部品を使う ---------- */
+const wtOfPr = n => WTS.findIndex(w => w.pr === +n);
+const prIssue = n => PRS[n].issue || (WTS[wtOfPr(n)] || {}).issue;
+const prBranch = n => PRS[n].branch || WTS[wtOfPr(n)].branch;
+const prDiff = n => PRS[n].diff || WTS[wtOfPr(n)].diff;
+const prUnread = n => { const i = wtOfPr(n); return i >= 0 ? WTS[i].prNew : PRS[n].unread; };
+const prNote = pr => { const ev = pr.ev || []; return ev.length ? ev[0][0] : pr.note || ''; };
+const cm = (who, sub, body, loc) => '<div class="cm">' + (loc ? '<div class="loc">' + loc + '</div>' : '') + '<div class="who"><b>' + who + '</b>　' + sub + '</div><p>' + body + '</p></div>';
+const none = '<div class="q">なし</div>';
+const wtLinks = list => '<div class="links">' + list.map(x => '<button data-wt="' + x[1] + '">' + esc(x[0].branch) + '</button>').join('') + '</div>';
+const reply = (ph, label) => '<div class="reply"><textarea class="in" placeholder="' + ph + '"></textarea><div class="bar"><button class="btn">' + label + '</button></div></div>';
+
+function issueDoc(n, here) {
+  const is = ISSUES[n];
+  const wts = WTS.map((w, i) => [w, i]).filter(x => x[0].issue === n && x[1] !== here);
+  const prs = Object.keys(PRS).filter(k => prIssue(k) === n);
+  return '<h2>' + esc(is.title) + '</h2><div class="sub"><span class="state">' + (is.closed ? 'Closed' : 'Open') + '</span><span>' + is.by + ' が' + is.when + 'に作成</span></div>' +
+    '<div class="doc-grid"><div>' + is.body +
+    '<h3>コメント ' + is.cm.length + '</h3>' + is.cm.map(c => cm(c[0], c[1], c[2])).join('') + reply('コメントを書く', 'コメント') + '</div>' +
+    '<div class="doc-side"><h3>ラベル</h3><div class="sub">' + is.labels.map(l => '<span class="lab" style="--h:' + HUE[l] + '">' + l + '</span>').join('') + '</div>' +
+    '<h3>Assignees</h3>' + (is.as ? '<div>' + is.as + '</div>' : none) +
+    '<h3>PR</h3>' + (prs.length ? '<div class="links ui">' + prs.map(k => '<button data-pr="' + k + '"><span class="num">#' + k + '</span> ' + esc(PRS[k].title) + '</button>').join('') + '</div>' : none) +
+    '<h3>' + (here >= 0 ? '同じ Issue の worktree' : 'worktree') + '</h3>' + (wts.length ? wtLinks(wts) : none) +
+    '</div></div>';
+}
+
+// files: [{path, add, del, lines}]。o.pr を渡すと、行ごとのレビューコメントとコメントの追加が付く
+function filesDoc(files, o) {
+  const pr = o.pr && PRS[o.pr];
+  return (files.length > 1 ? '<div class="flist">' + files.map(f => '<div><span>' + f.path + '</span><span class="ad">+' + f.add + '</span><span class="dl">−' + f.del + '</span></div>').join('') + '</div>' : '') +
+    files.map((f, fi) => '<div class="file"><div class="file-h"><span>' + f.path + '</span><span class="ad">+' + f.add + '</span><span class="dl">−' + f.del + '</span></div><div class="hunk' + (pr ? ' rv' : '') + '">' +
+      f.lines.map((l, li) => {
+        const key = fi + ':' + li, hd = l[0] === '@';
+        let h = '<div class="l ' + (l[0] === '+' ? 'pl' : l[0] === '-' ? 'mi' : hd ? 'h' : '') + '">' +
+          (pr && !hd ? '<button class="addc" data-addc="' + key + '" title="この行にコメント" aria-label="この行にコメント">' + ic('plus', 11) + '</button>' : '') + (esc(l) || ' ') + '</div>';
+        if (pr) {
+          const th = pr.threads.filter(t => t[1].split(':')[0] === f.path && t[3] === li);
+          const draft = S.draft === key;
+          if (th.length || draft) h += '<div class="lthread">' + th.map(t => cm(t[0], '', t[2])).join('') +
+            (draft ? '<div class="draft"><textarea class="in" id="draft" placeholder="この行へのコメント"></textarea><div class="bar"><button class="btn" data-a="draft-cancel">キャンセル</button><button class="btn primary" data-a="draft-add">コメントを追加</button></div></div>' : '') + '</div>';
+        }
+        return h;
+      }).join('') + '</div></div>').join('');
+}
+
+function prDoc(n, here) {
+  const pr = PRS[n], wi = wtOfPr(n), mine = pr.by === ME, files = prDiff(n), is = prIssue(n);
+  const [a, d] = stat(files);
+  const tab = (k, name) => '<button class="tab" role="tab" data-prtab="' + k + '" aria-selected="' + (S.prTab === k) + '"><b>' + name + '</b></button>';
+  const rv = r => r === 'Approve' ? 'ok' : r === 'Changes requested' ? 'need' : 'wait';
+  let h = '<h2>' + esc(pr.title) + '</h2><div class="sub"><span class="state">' + pr.state + '</span><span>' + pr.by + '</span><span class="mono">' + esc(prBranch(n)) + '</span></div>' +
+    '<div class="dtabs" role="tablist">' + tab('conv', 'Conversation') + tab('files', 'Files changed') + '<span class="sp"></span>' +
+    (S.prTab === 'files' ? '<details class="more rvw"><summary class="btn">レビューを送信</summary><div class="popf">' +
+      '<textarea class="in" placeholder="全体へのコメント"></textarea>' +
+      '<label class="ck"><input type="radio" name="rv" checked>Comment</label>' +
+      '<label class="ck"><input type="radio" name="rv"' + (mine ? ' disabled' : '') + '>Approve</label>' +
+      '<label class="ck"><input type="radio" name="rv"' + (mine ? ' disabled' : '') + '>Request changes</label>' +
+      (mine ? '<div class="q" style="margin-top:8px;font-size:12px">自分の PR は Approve / Request changes できません。</div>' : '') +
+      '<div class="bar"><button class="btn primary" data-a="noop">送信</button></div></div></details>' : '') + '</div>';
+  if (S.prTab === 'files') {
+    return h + (files.length ? '<div class="sub"><span>' + files.length + ' ファイル</span><span class="mono"><span class="ad">+' + a + '</span> <span class="dl">−' + d + '</span></span></div>' + filesDoc(files, { pr: n })
+      : '<div class="empty"><p>差分はありません。</p></div>');
+  }
+  const bad = pr.checks.filter(c => c[1] === 'fail').length;
+  const loose = pr.threads.filter(t => t[0] !== ME || t[3] == null);
+  return h + '<div class="doc-grid"><div>' + (pr.body || (is ? '<p>Closes #' + is + '</p>' : '')) +
+    (pr.news ? '<h3>前回のレビュー以降のコミット ' + pr.news.length + '</h3>' + pr.news.map(c => '<div class="cmt"><span class="mono">' + c[0] + '</span><span>' + c[1] + '</span></div>').join('') : '') +
+    '<h3>Checks' + (bad ? '　' + bad + ' 件失敗' : '') + '</h3>' +
+    pr.checks.map(c => '<div class="chk ' + c[1] + '">' + mark(c[1]) + '<span class="n">' + c[0] + '</span><span class="x">' + c[2] + '</span></div>').join('') +
+    (loose.length ? '<h3>レビューコメント ' + loose.length + '</h3>' + loose.map(c => cm(c[0], '', c[2], c[1])).join('') : '') +
+    (mine && pr.state !== 'Merged' ? '<div class="mergebar"><button class="btn' + (pr.can ? ' primary' : '') + '"' + (pr.can ? '' : ' disabled') + '>マージ</button><span>' + pr.merge + '</span></div>'
+      : pr.merge ? '<div class="mergebar"><span>' + pr.merge + '</span></div>' : '') +
+    reply('コメントを書く', 'コメント') + '</div>' +
+    '<div class="doc-side"><h3>レビュー</h3>' + (pr.reviews.length ? pr.reviews.map(r => '<div class="chk">' + mark(rv(r[1])) + '<span>' + r[0] + '</span><span class="x">' + r[1] + '</span></div>').join('') : none) +
+    '<h3>Issue</h3>' + (is ? '<div class="links ui"><button data-issue="' + is + '"><span class="num">#' + is + '</span> ' + esc(ISSUES[is].title) + '</button></div>' : none) +
+    (here >= 0 ? '' : '<h3>worktree</h3>' + (wi >= 0 ? wtLinks([[WTS[wi], wi]]) : none)) +
+    '</div></div>';
+}
+
+let lastDrawer = '';
+function renderDrawer() {
+  const k = S.drawer, el = $('drawer');
+  el.hidden = !k || S.screen !== 'wt'; if (el.hidden) return;
+  const w = WTS[S.sel], g = group(w);
+  let h = '', kind = '', ext = false;
+  if (k === 'issue') {
+    kind = w.issue ? 'Issue #' + w.issue : 'Issue'; ext = !!w.issue;
+    h = w.issue ? issueDoc(w.issue, S.sel) : '<div class="empty"><p>この worktree には Issue がありません。</p><button class="btn">Issue を選ぶ</button></div>';
+  } else if (k === 'pr') {
+    kind = w.pr ? 'PR #' + w.pr : 'PR'; ext = !!w.pr;
+    h = w.pr ? prDoc(w.pr, S.sel) : '<div class="empty"><p>' + (g === 'main' ? 'main に PR はありません。' : 'このブランチの PR はまだありません。') + '</p>' + (g === 'main' ? '' : '<button class="btn">PR を作成</button>') + '</div>';
+  } else {
+    kind = '差分';
+    if (!w.diff.length) h = '<div class="empty"><p>' + (g === 'done' ? 'main にマージ済みで、差分はありません。' : '差分はありません。') + '</p></div>';
+    else {
+      const [a, d] = stat(w.diff);
+      h = '<h2>Files changed ' + w.diff.length + '</h2><div class="sub"><span>main との差分</span><span class="mono"><span class="ad">+' + a + '</span> <span class="dl">−' + d + '</span></span>' +
+        (w.dirty ? '<span>未コミットの変更 ' + w.dirty + ' ファイル</span>' : '') + (w.unpushed ? '<span>push していないコミット ' + w.unpushed + '</span>' : '') + '</div>' + filesDoc(w.diff, {});
+    }
+  }
+  $('dkind').textContent = kind; $('dext').style.visibility = ext ? '' : 'hidden';
+  $('dbody').innerHTML = '<div class="doc">' + h + '</div>';
+  const key = S.sel + k + S.prTab; if (key !== lastDrawer) $('dbody').scrollTop = 0; lastDrawer = key;
+}
+
+/* ---------- Issue 画面、PR 画面 ---------- */
+const issueNums = () => Object.keys(ISSUES).map(Number).sort((a, b) => b - a);
+function issueRows() {
+  const q = S.isQ.trim().toLowerCase();
+  const list = issueNums().filter(n => !!ISSUES[n].closed === (S.isState === 'closed') && (!q || (ISSUES[n].title + ' #' + n).toLowerCase().includes(q)));
+  $('list').innerHTML = list.length ? list.map(n => {
+    const is = ISSUES[n], cnt = WTS.filter(w => w.issue === n).length;
+    return '<button class="row nomark" role="option" aria-selected="' + (n === S.issue) + '" data-issue="' + n + '"><span></span>' +
+      '<span class="br tx">' + esc(is.title) + '</span><span class="why"><span>#' + n + '</span><span class="q">' + is.labels.join('　') + '</span></span>' +
+      '<span class="ref"' + (cnt ? ' title="worktree ' + cnt + ' 件"' : '') + '>' + (cnt ? ic('branch', 12) + cnt : '') + '</span></button>';
+  }).join('') : '<div class="grp">該当する Issue はありません</div>';
+}
+function issueSide() {
+  const c = k => issueNums().filter(n => !!ISSUES[n].closed === (k === 'closed')).length;
+  const seg = (k, name) => '<button data-isst="' + k + '" aria-pressed="' + (S.isState === k) + '">' + name + ' ' + c(k) + '</button>';
+  $('lctl').innerHTML = '<div class="seg">' + seg('open', 'Open') + seg('closed', 'Closed') + '</div><input class="in" id="isq" type="search" placeholder="検索" aria-label="Issue を検索" value="' + esc(S.isQ) + '">';
+  issueRows();
+}
+const PRGROUPS = [['レビュー依頼', pr => pr.rr], ['自分の PR', pr => pr.by === ME], ['その他', pr => !pr.rr && pr.by !== ME]];
+const openPrs = () => Object.keys(PRS).map(Number).filter(n => PRS[n].state !== 'Merged' && PRS[n].state !== 'Closed').sort((a, b) => b - a);
+function prSide() {
+  $('lctl').innerHTML = '';
+  $('list').innerHTML = PRGROUPS.map(([name, f]) => {
+    const list = openPrs().filter(n => f(PRS[n]));
+    return !list.length ? '' : '<div class="grp' + (name === 'レビュー依頼' ? ' need' : '') + '"><span>' + name + '</span><span>' + list.length + '</span></div>' + list.map(n => {
+      const pr = PRS[n], ev = pr.ev || [], un = prUnread(n), has = wtOfPr(n) >= 0;
+      const mk = pr.rr ? mark(tone(un, 0)) : ev.length ? mark(tone(un, ev[0][1])) : '<span></span>';
+      return '<button class="row' + (pr.rr ? ' rr' : '') + (un ? ' unread' : '') + '" role="option" aria-selected="' + (n === S.pr) + '" data-pr="' + n + '">' + mk +
+        '<span class="br tx">' + esc(pr.title) + '</span><span class="why"><span class="q">#' + n + (pr.by !== ME ? ' ' + pr.by : '') + '</span><span class="w">' + (pr.rr && !ev.length ? 'レビュー依頼' : prNote(pr)) + '</span></span>' +
+        '<span class="ref"' + (has ? ' title="worktree あり"' : '') + '>' + (has ? ic('branch', 12) : '') + '</span></button>';
+    }).join('');
+  }).join('');
+}
+
+/* ---------- 設定（1つの画面。リポジトリごとのボタンもこの中のセクション） ---------- */
+// ベースディレクトリの下は github-mate が管理する：<base>/<owner>/<repo>/repo が本体、<base>/<owner>/<repo>/worktrees/<ブランチ> が worktree
+const BASE = '~/github-mate';
+const REPOS = [
+  { name: 'acme/webapp', url: 'git@github.com:acme/webapp.git' },
+  { name: 'acme/api-server', url: 'git@github.com:acme/api-server.git', info: { wts: 3, dirty: ['fix/88-request-timeout'], unp: [], run: 2 } },
+  { name: 'hinata/dotfiles', url: 'https://github.com/hinata/dotfiles', info: { wts: 0, dirty: [], unp: [], run: 0 } },
+  { name: 'acme/design-tokens', url: 'https://github.com/acme/design-tokens', cloning: 62 }
+];
+const AICMD = [{ k: 'claude', def: 'claude', cmd: 'claude --dangerously-skip-permissions' }, { k: 'codex', def: 'codex', cmd: 'codex --yolo' }, { k: 'agy', def: 'agy', cmd: 'agy' }];
+// すべてのリポジトリに並ぶボタン
+const BTNS = [
+  { ic: 'folder', name: 'フォルダを開く', kind: 'cmd', cmd: 'xdg-open {{worktree.path}}' },
+  { ic: 'code', name: 'VS Code', kind: 'cmd', cmd: 'code {{worktree.path}}' },
+  { ic: 'claude', name: 'Claude Code', kind: 'ai', ai: 'claude', cmd: '' },
+  { ic: 'codex', name: 'Codex', kind: 'ai', ai: 'codex', cmd: '' },
+  { ic: 'agy', name: 'Antigravity', kind: 'ai', ai: 'agy', cmd: '' },
+  { ic: 'issue', name: 'Issue を実装', kind: 'ai', ai: 'claude', cmd: '{{issue.url}} を実装して' },
+  { ic: 'review', name: 'PR をレビュー', kind: 'ai', ai: 'codex', cmd: 'PR #{{pr.number}} をレビューして' }
+];
+// リポジトリごとのボタン
+const RBTNS = {
+  'acme/webapp': [{ ic: 'build', name: 'ビルド', kind: 'cmd', cmd: 'pnpm build' }, { ic: 'test', name: 'テスト', kind: 'cmd', cmd: 'pnpm test' }],
+  'acme/api-server': [{ ic: 'build', name: 'ビルド', kind: 'cmd', cmd: 'cargo build' }, { ic: 'test', name: 'テスト', kind: 'cmd', cmd: 'cargo test' }],
+  'hinata/dotfiles': []
+};
+const HOLDERS = ['worktree.path', 'branch', 'issue.number', 'issue.url', 'issue.title', 'pr.number', 'pr.url'];
+const SECS = [['gen', '一般'], ['repo', 'リポジトリ'], ['ai', 'AI の起動コマンド'], ['btn', 'すべてのリポジトリのボタン']];
+const opts = (list, cur) => list.map(x => '<option' + (x === cur ? ' selected' : '') + '>' + x + '</option>').join('');
+// ボタンの一覧と編集フォーム。すべてのリポジトリのボタンと、リポジトリごとのボタンで同じものを使う
+function btnList(list) {
+  const edit = S.edit[S.screen];
+  const row = (b, i) => {
+    if (i !== edit) return '<div class="srow"><span class="grip" title="ドラッグして並べ替え">' + ic('grip') + '</span><span class="nm">' + ic(b.ic) + b.name + '</span>' +
+      '<span class="gr">' + (b.kind === 'ai' ? TOOL[b.ai] + (b.cmd ? '　<span class="mono q">' + esc(b.cmd) + '</span>' : ' を起動') : '<span class="mono">' + esc(b.cmd) + '</span>') + '</span>' +
+      '<button class="tbtn" data-editbtn="' + i + '">編集</button></div>';
+    const k = S.editKind || b.kind;
+    return '<div class="edit"><div class="fld">' +
+      '<span class="lb">アイコン</span><div class="icons">' + ['folder', 'code', 'claude', 'codex', 'agy', 'issue', 'pr', 'review', 'build', 'test', 'branch', 'copy'].map(x => '<button aria-pressed="' + (x === b.ic) + '" aria-label="' + x + '">' + ic(x) + '</button>').join('') + '</div>' +
+      '<label for="bn">名前</label><input class="in" id="bn" value="' + esc(b.name) + '">' +
+      '<span class="lb">種類</span><div class="seg"><button data-kind="ai" aria-pressed="' + (k === 'ai') + '">AI</button><button data-kind="cmd" aria-pressed="' + (k === 'cmd') + '">コマンド</button></div>' +
+      (k === 'ai' ? '<label for="ba">AI</label><select class="in" id="ba">' + opts(Object.values(TOOL), TOOL[b.ai || 'claude']) + '</select>' +
+          '<label for="bc">最初の指示</label><input class="in mono" id="bc" placeholder="なし（AI を起動するだけ）" value="' + esc(b.kind === 'ai' ? b.cmd : '') + '">' +
+          '<div class="note">起動コマンドとオプションは、設定の「AI の起動コマンド」を使います。</div>'
+        : '<label for="bc">コマンド</label><input class="in mono" id="bc" placeholder="pnpm build" value="' + esc(b.kind === 'cmd' ? b.cmd : '') + '">') +
+      '<span class="lb">プレースホルダー</span><div class="chips">' + HOLDERS.map(x => '<span>{{' + x + '}}</span>').join('') + '</div>' +
+      '<div class="note">' + (k === 'ai' ? '最初の指示' : 'コマンド') + 'の中で使えます。値がない worktree では、このボタンは押せません（Issue のない worktree での {{issue.url}} など）。</div>' +
+      '</div><div class="dlg-foot"><button class="tbtn danger">ボタンを削除</button><span class="sp"></span><button class="btn" data-editbtn="-1">キャンセル</button><button class="btn primary" data-editbtn="-1">保存</button></div></div>';
+  };
+  return (list.length ? list.map(row).join('') : '<div class="srow q">このリポジトリだけのボタンはまだありません。</div>') + '<button class="btn add">ボタンを追加</button>';
+}
+function setDoc() {
+  if (S.set === 'gen') return '<h2>一般</h2><p class="lead">リポジトリと worktree の置き場所です。</p>' +
+    '<div class="srow"><label class="nm" for="base">ベースディレクトリ</label><input class="in mono gr" id="base" value="' + BASE + '"><span class="tail"><button class="btn">フォルダを選ぶ</button></span></div>' +
+    '<p class="q after">この下のフォルダは github-mate が作成して管理します。</p>' +
+    '<div class="paths"><span class="mono">' + BASE + '/&lt;owner&gt;/&lt;repo&gt;/repo</span><span>リポジトリ本体</span>' +
+    '<span class="mono">' + BASE + '/&lt;owner&gt;/&lt;repo&gt;/worktrees/&lt;ブランチ&gt;</span><span>worktree</span></div>';
+  if (S.set === 'repo') return '<h2>リポジトリ</h2><p class="lead">URL を貼り付けると、github-mate がベースディレクトリの下にクローンします。</p>' +
+    '<div class="hb addrow"><input class="in mono" aria-label="リポジトリの URL" placeholder="git@github.com:owner/repo.git または https://github.com/owner/repo"><button class="btn">追加</button></div>' +
+    REPOS.map(r => '<div class="srow"><span class="nm" style="width:176px">' + r.name + '</span><span class="gr two"><span class="mono">' + r.url + '</span><span class="mono q">' + BASE + '/' + r.name + '</span></span><span class="tail">' +
+      (r.cloning ? mark('run') + '<span class="q">クローン中 ' + r.cloning + '%</span><button class="tbtn">中止</button>'
+        : '<button class="tbtn" data-rset="' + r.name + '">設定</button><button class="tbtn" data-rdel="' + r.name + '">削除</button>') + '</span></div>').join('');
+  if (S.set === 'ai') return '<h2>AI の起動コマンド</h2><p class="lead">AI を起動するボタンは、ここのコマンドでセッションを始めます。オプションを付けたい場合はここを書き換えます。</p>' +
+    AICMD.map((a, i) => '<div class="srow"><span class="nm">' + ic(a.k) + TOOL[a.k] + '</span><input class="in mono gr" data-aicmd="' + i + '" aria-label="' + TOOL[a.k] + ' の起動コマンド" value="' + esc(a.cmd) + '">' +
+      '<span class="tail">' + (a.cmd !== a.def ? '<span class="q">変更済み</span><button class="tbtn" data-reset="' + i + '">初期設定に戻す</button>' : '') + '</span></div>').join('');
+  return '<h2>すべてのリポジトリのボタン</h2><p class="lead">すべてのリポジトリの worktree に並ぶボタンです。この順番で並び、そのあとにリポジトリごとのボタンが続きます。</p>' +
+    btnList(BTNS) + '<p class="q after">ビルドやテストのようにリポジトリで違うボタンは、左の「リポジトリごとの設定」で登録します。</p>';
+}
+const rsetDoc = () => '<h2>' + S.rrepo + '</h2><p class="lead">このリポジトリだけの設定です。</p><h3 class="sec">ボタン</h3><p class="lead">このリポジトリの worktree にだけ並ぶボタンです。すべてのリポジトリのボタンのあとに、この順番で並びます。</p>' + btnList(RBTNS[S.rrepo] || []);
+const emptyDoc = () => '<div class="first"><h2>リポジトリを追加</h2><p class="lead">github-mate はリポジトリをクローンして、ブランチごとに worktree を作ります。置き場所と、最初のリポジトリを決めてください。</p>' +
+  '<div class="fld"><label for="e-base">ベースディレクトリ</label><div class="hb"><input class="in mono" id="e-base" value="' + BASE + '"><button class="btn">フォルダを選ぶ</button></div>' +
+  '<div class="note">リポジトリと worktree は、すべてこの下に作成されます。</div>' +
+  '<label for="e-url">リポジトリの URL</label><input class="in mono" id="e-url" placeholder="git@github.com:owner/repo.git または https://github.com/owner/repo"></div>' +
+  '<div class="bar"><button class="btn primary">クローンして始める</button></div></div>';
+
+let lastPage = '';
+function renderPage() {
+  const on = S.screen !== 'wt';
+  $('page').hidden = !on; $('main').hidden = on;
+  if (!on) { $('lctl').innerHTML = ''; return; }
+  const ext = '<button class="icon-btn" title="GitHub で開く" aria-label="GitHub で開く">' + ic('ext') + '</button>';
+  $('phead').hidden = false;
+  if (S.screen === 'issue') {
+    issueSide();
+    $('phead').innerHTML = '<span class="k">Issue #' + S.issue + '</span>' + ext + wtBtns(WTS.map((w, k) => w.issue === S.issue ? k : -1).filter(k => k >= 0), 'issue:' + S.issue);
+    $('pbody').innerHTML = '<div class="doc">' + issueDoc(S.issue, -1) + '</div>';
+  } else if (S.screen === 'pr') {
+    const i = wtOfPr(S.pr);
+    if (i >= 0) WTS[i].prNew = 0; else PRS[S.pr].unread = 0;
+    prSide();
+    $('phead').innerHTML = '<span class="k">PR #' + S.pr + '</span>' + ext + wtBtns(WTS.map((w, k) => w.pr === S.pr ? k : -1).filter(k => k >= 0), 'pr:' + S.pr);
+    $('pbody').innerHTML = '<div class="doc">' + prDoc(S.pr, -1) + '</div>';
+  } else if (S.screen === 'empty') {
+    $('lctl').innerHTML = ''; $('list').innerHTML = '<div class="grp">リポジトリがありません</div>';
+    $('phead').hidden = true; $('pbody').innerHTML = emptyDoc();
+  } else {
+    const repo = S.screen === 'rset';
+    $('lctl').innerHTML = '';
+    // 設定は1つの画面。リポジトリごとのボタンも同じサイドバーのセクションとして並べる
+    $('list').innerHTML = '<div class="grp need"><span>設定</span></div><div class="snav">' +
+      SECS.map(s => '<button data-set="' + s[0] + '"' + (!repo && S.set === s[0] ? ' aria-current="page"' : '') + '>' + s[1] + '</button>').join('') + '</div>' +
+      '<div class="grp need"><span>リポジトリごとの設定</span></div><div class="snav">' +
+      REPOS.filter(r => !r.cloning).map(r => '<button data-rset="' + r.name + '"' + (repo && S.rrepo === r.name ? ' aria-current="page"' : '') + '>' + r.name + '</button>').join('') + '</div>';
+    $('phead').innerHTML = '<span class="k">設定</span>';
+    $('pbody').innerHTML = '<div class="set">' + (repo ? rsetDoc() : setDoc()) + '</div>';
+  }
+  const key = S.screen + S.issue + '/' + S.pr + S.prTab + S.set + S.rrepo; if (key !== lastPage) $('page').scrollTop = 0; lastPage = key;
+}
+function renderNav() {
+  const none = S.screen === 'empty';
+  document.querySelectorAll('[data-screen]').forEach(b => { if (b.dataset.screen === (S.screen === 'rset' ? 'set' : S.screen)) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  const rr = none ? [] : openPrs().filter(n => PRS[n].rr && wtOfPr(n) < 0); // worktree のないレビュー依頼
+  $('prcnt').textContent = rr.length || ''; $('prpip').hidden = !rr.some(n => PRS[n].unread);
+  $('reponame').innerHTML = none ? '<span class="dim">リポジトリなし</span>' : '<span class="dim">acme/</span>webapp';
+  if (none) $('repopip').hidden = true;
+}
+
+/* ---------- ダイアログ ---------- */
+const slug = b => P + b.replace(/\//g, '-');
+const runSess = w => w.sess.filter(s => s.st === 'run' || (!s.st && !s.tool && s.name !== 'zsh'));
+function newDefaults(d) {
+  // Issue の題名は日本語のことがあるので、番号だけから機械的に決まる名前にする
+  const base = d.mode === 'issue' ? 'issue-' + d.issue : d.mode === 'pr' ? prBranch(d.pr) : '';
+  d.branch = base; OWN = d.mode === 'pr' ? base : '';
+  if (base) for (let k = 2; taken(d.branch); k++) d.branch = base + '-' + k;
+}
+// 同名のブランチがローカルかリモートにすでにあるか
+// PR から作るときは、その PR 自身のリモートブランチと同じ名前でよい
+let OWN = '';
+const taken = b => WTS.some(w => w.branch === b) ? 'ローカル' : b !== OWN && Object.values(PRS).some(q => q.branch === b) ? 'リモート' : '';
+const takenNote = b => taken(b) ? '同じ名前のブランチが' + taken(b) + 'にすでにあります。別の名前にしてください。' : '';
+// Issue / PR の画面の右上。すでにある worktree を開くボタンと、新しく作るボタンを並べる
+const wtBtns = (ix, arg) =>
+  (ix.length === 1 ? '<button class="btn" data-wt="' + ix[0] + '">worktree を開く</button>'
+    : ix.length ? '<details class="more"><summary class="btn">worktree を開く（' + ix.length + '）</summary><div class="pop right">' +
+      ix.map(k => '<button class="mono" data-wt="' + k + '">' + esc(WTS[k].branch) + '</button>').join('') + '</div></details>' : '') +
+  '<button class="btn' + (ix.length ? '' : ' primary') + '" data-new="' + arg + '">worktree を作成</button>';
+function openNew(arg) {
+  const [mode, n] = (arg || '').split(':');
+  const d = { t: 'new', mode: mode || 'none', issue: 220, pr: openPrs().find(k => wtOfPr(k) < 0) };
+  if (mode === 'issue') d.issue = +n; if (mode === 'pr') d.pr = +n;
+  newDefaults(d); S.dlg = d;
+}
+const pathNote = b => b ? slug(b) : P + '…';
+const loss = (name, v, warn, detail) => '<div' + (warn ? ' class="warn"' : '') + '><span>' + name + '</span><span class="v">' + v + (detail && detail.length ? '<span class="dt mono">' + detail.map(esc).join('<br>') + '</span>' : '') + '</span></div>';
+const ck = (d, k, label, dis) => '<label class="ck"><input type="checkbox" data-ck="' + k + '"' + (d[k] ? ' checked' : '') + (dis ? ' disabled' : '') + '><span>' + label + '</span></label>';
+const lossWords = (dirty, unp) => [dirty && '未コミットの変更', unp && 'push していないコミット'].filter(Boolean).join('と').replace('とpush', 'と push');
+function dlgDoc() {
+  const d = S.dlg;
+  if (d.t === 'new') {
+    // 同じ Issue / PR の worktree がすでにあれば、ブランチ名を添えて知らせる（作成は止めない）
+    const src = (k, n, title) => {
+      const has = WTS.filter(w => (k === 'PR' ? w.pr : w.issue) === n).map(w => w.branch);
+      return '<label>' + k + '</label><div class="note">#' + n + ' ' + esc(title) + '</div>' +
+        (has.length ? '<div class="note warnc">この ' + k + ' の worktree がすでにあります：<span class="mono">' + has.map(esc).join('、') + '</span></div>' : '');
+    };
+    return '<h2>' + (d.mode === 'issue' ? 'Issue から worktree を作成' : d.mode === 'pr' ? 'PR から worktree を作成' : '新しい worktree') + '</h2><div class="lead">acme/webapp</div><div class="fld">' +
+      (d.mode === 'issue' ? src('Issue', d.issue, ISSUES[d.issue].title) : '') +
+      (d.mode === 'pr' ? src('PR', d.pr, PRS[d.pr].title) : '') +
+      '<label for="nbranch">ブランチ名</label><input class="in mono" id="nbranch" placeholder="feat/..." value="' + esc(d.branch) + '">' +
+      '<div class="note mono" id="npath" title="作成先">' + esc(pathNote(d.branch)) + '</div>' +
+      '<div class="note bad" id="ntaken">' + takenNote(d.branch) + '</div>' +
+      (d.mode === 'pr' ? ''
+        : '<label for="nbase">ベースブランチ</label><select class="in mono" id="nbase">' + opts(['main'].concat(WTS.slice(1).map(w => w.branch)), 'main') + '</select>') +
+      '</div><div class="dlg-foot"><button class="btn" data-a="dlg-close">キャンセル</button><button class="btn primary" id="ncreate" data-a="dlg-close"' + (d.branch && !taken(d.branch) ? '' : ' disabled') + '>作成</button></div>';
+  }
+  if (d.t === 'rdel') {
+    const mine = d.r === 'acme/webapp', wts = WTS.slice(1);
+    const info = mine ? { wts: wts.length, dirty: wts.filter(w => w.dirty).map(w => w.branch), unp: wts.filter(w => w.unpushed).map(w => w.branch), run: WTS.reduce((n, w) => n + runSess(w).length, 0) }
+      : REPOS.find(r => r.name === d.r).info;
+    const what = lossWords(info.dirty.length, info.unp.length);
+    return '<h2>リポジトリを削除</h2><div class="lead"><span class="mono">' + d.r + '</span><br><span class="mono q">' + BASE + '/' + d.r + '</span></div>' +
+      '<p>クローンと worktree をディスクから削除します。GitHub のリポジトリは変わりません。</p><div class="loss">' +
+      loss('worktree', info.wts ? info.wts + ' 件' : 'なし') +
+      loss('未コミットの変更', info.dirty.length ? info.dirty.length + ' 件の worktree（失われます）' : 'なし', info.dirty.length, info.dirty) +
+      loss('push していないコミット', info.unp.length ? info.unp.length + ' 件の worktree（失われます）' : 'なし', info.unp.length, info.unp) +
+      loss('実行中のセッション', info.run ? info.run + ' 件（終了します）' : 'なし') + '</div>' +
+      (what ? '<div class="confirm">' + ck(d, 'ok', what + 'を破棄して削除する') + '</div>' : '') +
+      '<div class="dlg-foot"><button class="btn" data-a="dlg-close">キャンセル</button><button class="btn danger" data-a="dlg-close"' + (what && !d.ok ? ' disabled' : '') + '>削除</button></div>';
+  }
+  const w = WTS[d.i], pr = w.pr && PRS[w.pr], dirty = w.dirty || 0, unp = w.unpushed || 0, run = runSess(w);
+  const what = lossWords(dirty, unp);
+  return '<h2>worktree を削除</h2><div class="lead"><span class="mono">' + esc(w.branch) + '</span><br><span class="mono q">' + w.path + '</span></div>' +
+    '<div class="loss">' +
+    loss('未コミットの変更', dirty ? dirty + ' ファイル（失われます）' : 'なし', dirty) +
+    loss('push していないコミット', unp ? unp + ' 件' : 'なし', unp) +
+    loss('実行中のセッション', run.length ? run.map(s => s.tool ? TOOL[s.tool] : s.name).join('、') + '（終了します）' : 'なし') +
+    loss('PR', pr ? '#' + w.pr + ' ' + (pr.state === 'Merged' ? 'マージ済み' : pr.state + '（マージされていません）') : 'なし') +
+    '</div>' +
+    ck(d, 'br', 'ローカルブランチも削除する') +
+    ck(d, 'rb', pr && pr.by !== ME ? 'リモートブランチも削除する（' + pr.by + ' のブランチは削除できません）' : pr ? 'リモートブランチも削除する' : 'リモートブランチも削除する（push されていません）', !pr || pr.by !== ME) +
+    (what ? '<div class="confirm">' + ck(d, 'ok', what + 'を破棄して削除する') + '</div>' : '') +
+    '<div class="dlg-foot"><button class="btn" data-a="dlg-close">キャンセル</button><button class="btn danger" data-a="dlg-close"' + (what && !d.ok ? ' disabled' : '') + '>削除</button></div>';
+}
+function renderDlg() {
+  $('scrim').hidden = !S.dlg;
+  if (S.dlg) $('dlg').innerHTML = dlgDoc();
+}
+const openDel = i => { const w = WTS[i], pr = w.pr && PRS[w.pr]; S.dlg = { t: 'del', i, br: !!(pr && pr.state === 'Merged'), rb: false, ok: false }; };
+
+// いま見えているものを既読にする：表示中のタブ、開いている PR / Issue
+function seen() {
+  const w = WTS[S.sel];
+  if (S.sess[S.sel] == null) {
+    // 最初に開くタブは、未読のセッション、なければ対応が残っているセッション
+    const pick = f => w.sess.findIndex(f);
+    const i = [s => s.unread && ATT[s.st] && ATT[s.st][1], s => s.unread, s => ATT[s.st] && ATT[s.st][1], s => ATT[s.st]].map(pick).find(x => x >= 0);
+    S.sess[S.sel] = i || 0;
+  }
+  if (S.screen !== 'wt') return;
+  w.sess[S.sess[S.sel]].unread = 0;
+  if (S.drawer === 'pr') w.prNew = 0;
+  if (S.drawer === 'issue' && w.issue) ISSUES[w.issue].fresh = 0;
+}
+const render = () => { seen(); renderMain(); renderDrawer(); renderList(); renderPage(); renderNav(); renderDlg(); };
+// worktree を選ぶと、その行は既読になる
+const select = i => { S.sel = i; WTS[i].unread = 0; };
+
+document.addEventListener('click', e => {
+  document.querySelectorAll('details[open]').forEach(d => { if (!d.contains(e.target) || e.target.closest('.pop')) d.open = false; });
+  if (e.target.id === 'scrim') { S.dlg = null; render(); return; }
+  const t = e.target.closest('[data-del],[data-new],[data-wt],[data-sess],[data-open],[data-mk],[data-screen],[data-issue],[data-pr],[data-prtab],[data-isst],[data-set],[data-editbtn],[data-kind],[data-reset],[data-rset],[data-rdel],[data-addc],[data-nmode],[data-a],#dclose');
+  if (!t || t.disabled) return;
+  const D = t.dataset;
+  if (D.del != null) { e.stopPropagation(); openDel(D.del === 'sel' ? S.sel : +D.del); }
+  else if (D.new != null) openNew(D.new);
+  else if (D.wt) { S.screen = 'wt'; select(+D.wt); }
+  else if (D.sess) S.sess[S.sel] = +D.sess;
+  else if (D.open) S.drawer = S.drawer === D.open ? null : D.open;
+  else if (D.mk) WTS[S.sel].unread = 1;
+  else if (D.screen) S.screen = D.screen;
+  else if (D.issue) { S.screen = 'issue'; S.issue = +D.issue; if (!!ISSUES[S.issue].closed !== (S.isState === 'closed')) S.isState = ISSUES[S.issue].closed ? 'closed' : 'open'; }
+  else if (D.pr) { S.screen = 'pr'; S.pr = +D.pr; S.prTab = 'conv'; S.draft = null; }
+  else if (D.prtab) { S.prTab = D.prtab; S.draft = null; }
+  else if (D.isst) S.isState = D.isst;
+  else if (D.set) { S.screen = 'set'; S.set = D.set; }
+  else if (D.rset) { S.screen = 'rset'; S.rrepo = D.rset; }
+  else if (D.rdel) S.dlg = { t: 'rdel', r: D.rdel, ok: false };
+  else if (D.editbtn) { S.edit[S.screen] = +D.editbtn; S.editKind = null; }
+  else if (D.kind) S.editKind = D.kind;
+  else if (D.reset) AICMD[+D.reset].cmd = AICMD[+D.reset].def;
+  else if (D.addc) S.draft = D.addc;
+  else if (D.a === 'dlg-close') S.dlg = null;
+  else if (D.a === 'draft-cancel') S.draft = null;
+  else if (D.a === 'draft-add') {
+    // 追加したコメントは、その行のスレッドに入る（レビューを送信するまでは下書き）
+    const text = $('draft').value.trim(), n = S.screen === 'pr' ? S.pr : WTS[S.sel].pr, [fi, li] = S.draft.split(':').map(Number);
+    if (text) PRS[n].threads.push([ME, prDiff(n)[fi].path, esc(text), li]);
+    S.draft = null;
+  }
+  else if (t.id === 'dclose') S.drawer = null;
+  render();
+  if (D.addc) $('draft').focus();
+});
+document.addEventListener('change', e => {
+  const t = e.target, d = S.dlg;
+  if (t.dataset.ck) { d[t.dataset.ck] = t.checked; renderDlg(); }
+  else if (t.id === 'nissue') { d.issue = +t.value; newDefaults(d); renderDlg(); }
+  else if (t.id === 'npr') { d.pr = +t.value; newDefaults(d); renderDlg(); }
+  else if (t.dataset.aicmd) { AICMD[+t.dataset.aicmd].cmd = t.value.trim(); render(); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'isq') { S.isQ = t.value; issueRows(); }
+  else if (t.id === 'nbranch') { S.dlg.branch = t.value.trim(); $('npath').textContent = pathNote(S.dlg.branch); $('ntaken').textContent = takenNote(S.dlg.branch); $('ncreate').disabled = !S.dlg.branch || !!taken(S.dlg.branch); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (S.dlg) S.dlg = null; else if (S.drawer) S.drawer = null; else return;
+  render();
+});
+/* 開いた直後の状態を URL のハッシュで指定できる。
+   #ブランチ名,パネル,セッション,PR のタブ ／ #issue,番号 ／ #pr,番号,files ／ #set,btn ／ #rset,acme/webapp,0 ／ #new,issue,番号 ／ #del,ブランチ名,ok ／ #rdel,acme/webapp ／ #empty */
+const h0 = decodeURIComponent(location.hash.slice(1)).split(',');
+const byBranch = b => Math.max(WTS.findIndex(w => w.branch === b), 0);
+select(byBranch('fix/214-search-pagination-dup'));
+if (h0[0] === 'issue') { S.screen = 'issue'; if (ISSUES[h0[1]]) S.issue = +h0[1]; }
+else if (h0[0] === 'pr') { S.screen = 'pr'; if (PRS[h0[1]]) S.pr = +h0[1]; if (h0[2]) S.prTab = h0[2]; }
+else if (h0[0] === 'set') { S.screen = 'set'; if (h0[1]) S.set = h0[1]; }
+else if (h0[0] === 'rset') { S.screen = 'rset'; if (RBTNS[h0[1]]) S.rrepo = h0[1]; if (h0[2]) S.edit.rset = +h0[2]; }
+else if (h0[0] === 'rdel') { S.screen = 'set'; S.set = 'repo'; S.dlg = { t: 'rdel', r: h0[1] || 'acme/webapp', ok: false }; }
+else if (h0[0] === 'empty') S.screen = 'empty'; // リポジトリがまだ 1 つもないとき
+else if (h0[0] === 'new') { openNew(h0[1] ? h0[1] + ':' + h0[2] : ''); if (h0[3]) S.dlg.branch = h0[3]; }
+else if (h0[0] === 'del') { openDel(byBranch(h0[1])); S.dlg.ok = h0[2] === 'ok'; }
+else if (h0[0]) {
+  select(byBranch(h0[0]));
+  if (h0[1]) S.drawer = h0[1];
+  if (h0[2]) S.sess[S.sel] = +h0[2];
+  if (h0[3]) S.prTab = h0[3];
+}
+render();
+</script>
+</body>
+</html>

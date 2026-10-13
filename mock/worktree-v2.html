@@ -1,0 +1,1660 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>github-mate 画面モック v2</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#eef0f4; --surface:#ffffff; --surface2:#f6f7fa; --line:#d9dde6; --line2:#e8ebf1;
+  --text:#1b2030; --muted:#5f6779; --faint:#8a92a3;
+  --primary:#3451c6; --primary-bg:#e7ebfb; --on-primary:#ffffff;
+  --wait:#f2a100; --wait-fg:#2a1c00; --wait-tint:#fff4d6; --wait-line:#c97f00;
+  --run:#0b7285; --run-tint:#e0f4f7;
+  --ok:#2b8a3e; --ok-tint:#e3f5e6; --fail:#c92a2a; --fail-tint:#fde8e8;
+  --merged:#6741d9; --merged-tint:#ede8fc; --pend:#a8730a;
+  --term-bg:#1a1e26; --term-fg:#d3d8e2; --term-dim:#8791a5; --term-line:#2c323e;
+  --add-bg:#e2f6e5; --del-bg:#fde6e6; --add-num:#c9edcf; --del-num:#f9cfcf; --hunk:#eef1fb;
+  --shadow:0 1px 2px rgba(20,28,50,.06),0 8px 28px rgba(20,28,50,.12);
+  --ui:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Mono","DejaVu Sans Mono",Menlo,Consolas,"Noto Sans Mono CJK JP",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14171d; --surface:#1c2028; --surface2:#222730; --line:#313846; --line2:#282e3a;
+    --text:#e3e7ef; --muted:#9aa3b5; --faint:#747d90;
+    --primary:#8ea3ff; --primary-bg:#262e4d; --on-primary:#10142a;
+    --wait:#ffb520; --wait-fg:#2a1c00; --wait-tint:#3a2e12; --wait-line:#ffb520;
+    --run:#4cc9db; --run-tint:#15323a;
+    --ok:#5fcf75; --ok-tint:#17321e; --fail:#ff7373; --fail-tint:#3b1c1f;
+    --merged:#b49cff; --merged-tint:#2a2346; --pend:#e0b040;
+    --term-bg:#0f1217; --term-fg:#d3d8e2; --term-dim:#7d879b; --term-line:#252b36;
+    --add-bg:#173021; --del-bg:#3a1d21; --add-num:#1f4a2e; --del-num:#57262c; --hunk:#20263a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 32px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.55 var(--ui);overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+code,.mono{font-family:var(--mono);font-size:12px}
+h1,h2,h3,p{margin:0}
+svg{flex:none}
+[hidden]{display:none!important}
+
+/* ---- frame ---- */
+#app{display:grid;grid-template-rows:46px 1fr;grid-template-columns:68px minmax(0,1fr);height:100vh;min-width:1000px}
+.bar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;display:flex;align-items:center;gap:7px;margin-right:4px}
+.brand i{width:18px;height:18px;border-radius:5px;background:var(--primary);display:grid;place-items:center;color:var(--on-primary)}
+.repo{position:relative}
+.repo-btn{display:flex;align-items:center;gap:7px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface2);font-family:var(--mono);font-size:12.5px;font-weight:600}
+.repo-menu{position:absolute;top:36px;left:0;width:310px;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:5px;z-index:30}
+.repo-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border-radius:6px}
+.repo-menu button:hover{background:var(--surface2)}
+.repo-menu button[aria-current=true]{background:var(--primary-bg)}
+.repo-menu .nm{font-family:var(--mono);font-size:12.5px;font-weight:600;flex:1}
+.repo-menu .ct{color:var(--muted);font-size:12px}
+.repo-menu .add{color:var(--muted);border-top:1px solid var(--line2);border-radius:0 0 6px 6px;margin-top:4px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px;margin-left:8px}
+.seg button{display:flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:6px;color:var(--muted);font-weight:600}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.08)}
+.grow{flex:1}
+.alert{display:flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:14px;background:var(--wait);color:var(--wait-fg);font-weight:700;white-space:nowrap}
+.alert.none{background:none;color:var(--muted);font-weight:500;border:1px solid var(--line)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{background:var(--fail);border-color:var(--fail);color:#fff}
+@media (prefers-color-scheme: dark){.btn.ok,.btn.danger{color:#0f1217}}
+.btn.sm{height:25px;padding:0 8px;font-size:12px;border-radius:6px}
+.btn[disabled]{opacity:.5;cursor:default}
+.del{color:var(--fail)}
+
+.rail{display:flex;flex-direction:column;gap:4px;padding:8px 6px;background:var(--surface);border-right:1px solid var(--line)}
+.rail button{display:grid;justify-items:center;gap:2px;padding:8px 0 6px;border-radius:8px;color:var(--muted);font-size:11px;font-weight:600;position:relative}
+.rail button:hover{background:var(--surface2);color:var(--text)}
+.rail button[aria-current=true]{background:var(--primary-bg);color:var(--primary)}
+.rail .n{font-size:10.5px;font-weight:500;color:var(--faint)}
+.rail .wd{position:absolute;top:6px;right:12px;width:9px;height:9px;border-radius:50%;background:var(--wait);box-shadow:0 0 0 2px var(--surface)}
+.rail .sp{flex:1}
+
+/* ---- state chips ---- */
+.st{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:10px;font-size:11.5px;font-weight:700;white-space:nowrap;font-family:var(--ui)}
+.st.wait{background:var(--wait);color:var(--wait-fg);box-shadow:0 0 0 3px color-mix(in srgb,var(--wait) 28%,transparent)}
+.st.run{background:var(--run-tint);color:var(--run)}
+.st.done{background:none;color:var(--faint);box-shadow:inset 0 0 0 1px var(--line);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor}
+.st.wait .dot{animation:pulse 1.4s ease-in-out infinite}
+.spin{display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:rot .9s linear infinite}
+@keyframes pulse{50%{transform:scale(.55);opacity:.55}}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes blink{50%{opacity:0}}
+.chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:5px;font-size:11.5px;font-weight:600;white-space:nowrap;background:var(--surface2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line2)}
+.chip.none{background:none;box-shadow:inset 0 0 0 1px var(--line);color:var(--faint);font-weight:500}
+.chip.open{color:var(--ok);background:var(--ok-tint);box-shadow:none}
+.chip.merged{color:var(--merged);background:var(--merged-tint);box-shadow:none}
+.chip.ok{color:var(--ok);background:var(--ok-tint);box-shadow:none}
+.chip.fail{color:var(--fail);background:var(--fail-tint);box-shadow:none}
+.chip.pend{color:var(--pend)}
+.chip.rev{color:var(--primary);background:var(--primary-bg);box-shadow:none}
+.chip.who{background:none;box-shadow:none;padding:0 2px;color:var(--muted);font-weight:500}
+.chip .av{width:14px;height:14px;font-size:7.5px}
+button.chip:hover{box-shadow:inset 0 0 0 1px var(--primary);color:var(--primary)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.num{font-family:var(--mono);color:var(--muted);font-size:12px}
+.branch{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11.5px;color:var(--muted);min-width:0}
+.branch span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-title{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12.5px;font-weight:700;min-width:0;flex:1}
+.bt-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.il{display:flex;gap:6px;min-width:0;color:var(--muted)}
+.il .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.il.no{color:var(--faint)}
+.lab{display:inline-block;padding:0 7px;height:18px;line-height:18px;border-radius:9px;font-size:11px;font-weight:600;background:hsl(var(--h) 70% 90%);color:hsl(var(--h) 60% 26%)}
+@media (prefers-color-scheme: dark){.lab{background:hsl(var(--h) 40% 22%);color:hsl(var(--h) 75% 80%)}}
+.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:hsl(var(--h) 45% 50%);color:#fff;font-size:9.5px;font-weight:700;flex:none}
+.av.lg{width:28px;height:28px;font-size:11px}
+
+/* ---- list + detail ---- */
+#main{min-height:0;min-width:0;overflow:hidden}
+.ld{display:grid;grid-template-columns:340px minmax(0,1fr);height:100%}
+.ld.wide{grid-template-columns:430px minmax(0,1fr)}
+.list{display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--surface);min-height:0;min-width:0}
+.list-h{display:flex;align-items:center;gap:8px;padding:10px 12px 8px;font-weight:700}
+.list-h small{color:var(--muted);font-weight:500;flex:1}
+.rows{overflow:auto;flex:1}
+.row{display:block;width:100%;padding:9px 12px 10px 13px;border-bottom:1px solid var(--line2);border-left:3px solid transparent;cursor:pointer}
+.row:hover{background:var(--surface2)}
+.row[aria-selected=true]{background:var(--primary-bg);border-left-color:var(--primary)}
+.row.wait{border-left-color:var(--wait)}
+.row.wait:not([aria-selected=true]){background:var(--wait-tint)}
+.row .l1{display:flex;gap:7px;align-items:center}
+.row .tt{flex:1;font-weight:600;line-height:1.4}
+.row .l2{margin-top:3px}
+.row .l3{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px}
+.row .wl{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px;color:var(--muted);font-size:12px}
+.row .wl .sp{flex:1}
+.ai{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:12px;color:var(--muted)}
+.ai span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.ai .wait{color:var(--wait-line);font-weight:700}.ai .run{color:var(--run)}
+.why{color:var(--wait-line);font-weight:700;font-size:12px;white-space:nowrap}
+.list-f{padding:10px 12px;border-top:1px solid var(--line)}
+.list-f .btn{width:100%;justify-content:center}
+
+.detail{display:flex;flex-direction:column;min-width:0;min-height:0}
+.dh{padding:11px 16px 0;background:var(--surface);border-bottom:1px solid var(--line)}
+.dh .top{display:flex;align-items:center;gap:10px}
+.dh h1{font:700 15px/1.4 var(--mono);display:flex;gap:7px;align-items:center;flex:1;min-width:0}
+.dh h1 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dh .meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;margin-top:6px;color:var(--muted)}
+.dh .meta .il{max-width:100%}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.act{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface2);font-weight:600;font-size:12.5px}
+button.act:not([disabled]):hover{border-color:var(--primary);color:var(--primary)}
+.act[disabled],.act.off{opacity:.42;cursor:not-allowed;border-style:dashed}
+.act.add{border-style:dashed;background:none;color:var(--muted);padding:0 9px}
+.tabs{display:flex;gap:2px;margin-top:10px}
+.tabs button{display:flex;align-items:center;gap:6px;padding:7px 13px 8px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600;margin-bottom:-1px}
+.tabs button[aria-selected=true]{color:var(--text);border-bottom-color:var(--primary)}
+.cnt{font-size:11px;background:var(--bg);border-radius:8px;padding:0 6px;color:var(--muted)}
+.tabs .wd{width:8px;height:8px;border-radius:50%;background:var(--wait)}
+.body{flex:1;min-height:0;overflow:auto}
+
+/* issue / pr page */
+.page{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;padding:16px 18px 28px;max-width:1080px}
+.ph{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.ph h2{font-size:17px;font-weight:700;flex-basis:100%}
+.big{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:12px;font-weight:700;font-size:12px;color:#fff;background:var(--ok)}
+.big.merged,.big.closed{background:var(--merged)}.big.draft{background:var(--faint)}
+@media (prefers-color-scheme: dark){.big{color:#0f1217}}
+.cm{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;margin-bottom:14px}
+.cm .box{border:1px solid var(--line);border-radius:8px;background:var(--surface);min-width:0}
+.cm .hd{padding:6px 12px;border-bottom:1px solid var(--line2);background:var(--surface2);border-radius:8px 8px 0 0;color:var(--muted);font-size:12px}
+.cm .hd b{color:var(--text)}
+.cm .tx{padding:10px 12px;line-height:1.7}
+.cm .tx p+p,.cm .tx ul+p,.cm .tx p+ul{margin-top:8px}
+.cm .tx ul{margin:0;padding-left:20px}
+.cm .tx code,.rc code{background:var(--surface2);padding:1px 4px;border-radius:4px}
+.ev{display:flex;align-items:center;gap:8px;margin:0 0 12px 38px;color:var(--muted);font-size:12.5px}
+.ev b{color:var(--text);font-weight:600}
+.ev .sha{font-family:var(--mono);font-size:11.5px}
+.ev.okc,.ev.okc b{color:var(--ok)}
+.reply{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:9px 12px;color:var(--faint);min-height:62px}
+.reply-a{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.side section{padding:0 0 12px;margin-bottom:12px;border-bottom:1px solid var(--line2)}
+.side h3{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.side .li{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-width:0}
+.side .li .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.box2{border:1px solid var(--line);border-radius:8px;background:var(--surface);margin:4px 0 16px 38px}
+.box2 .r{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line2)}
+.box2 .r:last-child{border-bottom:0}
+.box2 .r.h{font-weight:700;background:var(--surface2);border-radius:8px 8px 0 0}
+.box2 .r .t{flex:1}.box2 .r small{color:var(--muted)}
+.box2 .mg{padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ic-ok{color:var(--ok)}.ic-fail{color:var(--fail)}.ic-pend{color:var(--pend)}.ic-mg{color:var(--merged)}
+.sub{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:2}
+.sub button{padding:8px 12px;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;gap:6px;align-items:center}
+.sub button[aria-selected=true]{color:var(--text);border-bottom-color:var(--primary)}
+.empty{display:grid;place-items:center;align-content:center;gap:10px;height:100%;min-height:300px;color:var(--muted);text-align:center;padding:24px}
+.empty b{color:var(--text);font-size:15px}
+.empty .bs{display:flex;gap:8px;margin-top:4px}
+.empty .form{width:min(520px,100%);text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:14px;display:grid;gap:9px;margin-top:6px}
+.field{border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:var(--surface2);color:var(--text);min-height:32px}
+
+/* diff */
+.dwrap{padding:14px 18px 28px}
+.dsum{display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted)}
+.dsum b{color:var(--text)}
+.plus{color:var(--ok);font-weight:700}.minus{color:var(--fail);font-weight:700}
+.flist{border:1px solid var(--line);border-radius:8px;background:var(--surface);margin-bottom:14px}
+.flist div{display:flex;gap:10px;padding:5px 12px;border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:12px}
+.flist div:last-child{border:0}.flist .p{flex:1}
+.file{border:1px solid var(--line);border-radius:8px;background:var(--surface);margin-bottom:14px;overflow:hidden}
+.file .fh{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--surface2);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;font-weight:600}
+.file .fh .p{flex:1}
+.dl{display:grid;grid-template-columns:44px 44px minmax(0,1fr);font:12px/20px var(--mono)}
+.dl .n{text-align:right;padding-right:8px;color:var(--faint);user-select:none}
+.dl .c{white-space:pre;overflow:hidden;text-overflow:ellipsis;padding-left:8px}
+.dl.add .c{background:var(--add-bg)}.dl.add .n{background:var(--add-num)}
+.dl.del .c{background:var(--del-bg)}.dl.del .n{background:var(--del-num)}
+.dl.hunk .c,.dl.hunk .n{background:var(--hunk);color:var(--muted)}
+.rv .dl:not(.hunk):hover .n:first-child::before{content:"+";float:left;margin:2px 0 0 4px;width:16px;height:16px;line-height:16px;border-radius:4px;background:var(--primary);color:var(--on-primary);text-align:center;font-weight:700}
+.rc{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface2);padding:10px 14px 10px 58px;font-family:var(--ui)}
+.rc .one{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;margin-bottom:8px;max-width:700px}
+.rc .one b{font-size:12.5px}.rc .one small{color:var(--muted);margin-left:6px}
+.rc .field{max-width:700px;color:var(--faint)}
+
+/* terminal */
+.tw{display:flex;flex-direction:column;height:100%;background:var(--term-bg)}
+.stabs{display:flex;align-items:center;gap:2px;padding:5px 8px 0;background:var(--surface2);border-bottom:1px solid var(--line)}
+.stabs .s{display:flex;align-items:center;gap:6px;padding:5px 11px 6px;border:1px solid transparent;border-bottom:0;border-radius:7px 7px 0 0;color:var(--muted);font-weight:600;font-size:12.5px;margin-bottom:-1px}
+.stabs .s[aria-selected=true]{background:var(--term-bg);color:var(--term-fg);border-color:var(--line)}
+.stabs .wait{color:var(--wait)}.stabs .run{color:var(--run)}.stabs .done{color:var(--faint)}
+.stabs .sp{margin-left:auto;margin-bottom:4px}
+.panes{flex:1;display:grid;grid-template-columns:minmax(0,1fr);min-height:0}
+.panes.split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pane+.pane{border-left:1px solid var(--term-line)}
+.pane .pt{display:flex;align-items:center;gap:8px;padding:4px 12px;font-size:11.5px;color:var(--term-dim);border-bottom:1px solid var(--term-line);font-family:var(--mono);min-height:28px}
+.pane .pt .st{height:18px}
+.term{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:10px 14px 12px;font:12.5px/1.6 var(--mono);color:var(--term-fg);min-height:0}
+.term div{white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.6em;flex:none}
+.term .u{background:#ffffff12;border-radius:4px;padding:1px 8px;margin:5px -8px;color:#fff}
+.term .t{font-weight:700}.term .t::before{content:"● ";color:#5fcf75}
+.term .a::before{content:"● ";color:#c7cedb}
+.term .o{color:var(--term-dim);padding-left:2ch}.term .o::before{content:"⎿ "}
+.term .d{color:var(--term-dim)}
+.term .p,.term .g{color:#7fd4a0}.term .m,.term .e{color:#ff8a8a}
+.term .w{color:#ffc94d;border-left:2px solid #ffb520;padding-left:10px;margin-left:2px;background:#ffb5200f}
+.term .s{color:#e8a66b}
+.cur{display:inline-block;width:.6em;height:1.1em;vertical-align:-2px;background:var(--term-fg);animation:blink 1.1s steps(1) infinite}
+.sp-ch{display:inline-block;animation:rot 2.4s linear infinite}
+
+/* ---- tiles ---- */
+.tiles{height:100%;overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));grid-auto-rows:minmax(320px,calc((100vh - 46px - 60px)/2));gap:12px}
+.tile{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--term-bg);min-width:0}
+.tile.wait{border-color:var(--wait);box-shadow:0 0 0 2px var(--wait)}
+.tile .th{display:block;width:100%;background:var(--surface);padding:8px 11px 9px;border-bottom:1px solid var(--line)}
+.tile.wait .th{background:var(--wait-tint)}
+.tile .th:hover .bt-title span{text-decoration:underline}
+.tile .l1{display:flex;gap:7px;align-items:center}
+.tile .l2{margin-top:3px}
+.tile .l3{margin-top:6px}
+.tile .term{font-size:12px;padding:8px 12px 10px}
+.tile .tf{display:flex;align-items:center;gap:8px;padding:5px 11px;border-top:1px solid var(--term-line);color:var(--term-dim);font-size:11.5px}
+.tile .tf .sn{font-family:var(--mono)}
+.tile .tf .more{margin-left:auto}
+
+/* ---- board ---- */
+.board{height:100%;overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:12px;align-items:start}
+.col{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px;min-height:200px;min-width:0}
+.col h2{font-size:13px;font-weight:700;padding:4px 6px 9px;display:flex;align-items:center;gap:7px}
+.col h2 small{font-weight:600;color:var(--muted);background:var(--bg);border-radius:9px;padding:0 7px}
+.card{display:block;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px 10px;margin-bottom:8px;border-left:3px solid var(--line)}
+.card:hover{border-color:var(--primary)}
+.card.wait{border-left-color:var(--wait);background:var(--wait-tint)}
+.card.run{border-left-color:var(--run)}
+.card .l1{display:flex;align-items:center;gap:6px}
+.card .il{margin:4px 0 6px}
+.card .chips{margin-top:7px}
+
+/* ---- overlays ---- */
+.ov{position:fixed;inset:0;background:rgba(10,14,24,.45);display:grid;place-items:center;z-index:50}
+.dlg{width:min(600px,calc(100vw - 48px));max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.dlg-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.dlg-h h2{font-size:15px;flex:1}
+.dlg-b{overflow:auto;padding:14px 16px}
+.dlg-f{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.frm{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px 12px;align-items:center}
+.frm label{color:var(--muted);font-weight:600}
+.frm input,.frm select,.bt input,.bt select{font:inherit;color:var(--text);background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:6px 9px;width:100%}
+.frm input.mono,.bt input.mono{font-family:var(--mono);font-size:12px}
+.frm .note{grid-column:2;color:var(--muted);font-size:12px;margin-top:-6px}
+.chk{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 8px;align-items:start;padding:9px 0;border-bottom:1px solid var(--line2)}
+.chk small{grid-column:2/-1;color:var(--muted)}
+.chk .v{color:var(--muted);white-space:nowrap}
+.chk.warn .v{color:var(--wait-line);font-weight:700}
+.chk i.m{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:var(--ok-tint);color:var(--ok);margin-top:1px;font-style:normal}
+.chk.warn i.m{background:var(--wait);color:var(--wait-fg);font-weight:800;font-size:12px}
+.opt{display:flex;gap:8px;align-items:flex-start;padding:8px 0 0}
+.opt small{display:block;color:var(--muted)}
+.opt.off{opacity:.55}
+.set{position:fixed;inset:0;background:var(--bg);z-index:60;display:grid;grid-template-rows:46px 1fr}
+.set-b{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:0}
+.set-nav{border-right:1px solid var(--line);background:var(--surface);padding:12px 8px}
+.set-nav div{padding:7px 10px;border-radius:6px;color:var(--faint)}
+.set-nav div.on{background:var(--primary-bg);color:var(--text);font-weight:700}
+.set-nav small{display:block;padding:10px 10px 0;color:var(--faint);line-height:1.5}
+.set-c{overflow:auto;padding:22px 28px 40px}
+.set-c h2{font-size:18px;margin-bottom:4px}
+.set-c>p{color:var(--muted);max-width:76ch;margin-bottom:16px}
+.prev{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 12px;border:1px dashed var(--line);border-radius:9px;max-width:1180px}
+.prev>span{color:var(--muted);font-size:12px;white-space:nowrap}
+.prev .acts{margin:0}
+table.bt{border-collapse:collapse;width:100%;max-width:1180px;background:var(--surface);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.bt th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--line)}
+.bt td{padding:8px 12px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.bt tr:last-child td{border-bottom:0}
+.bt .ic{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;background:var(--surface2)}
+.bt .grip{color:var(--faint);cursor:grab;width:14px}
+.bt tr.edit td{background:var(--primary-bg)}
+.bt .ops{display:flex;gap:6px;justify-content:flex-end}
+.maintag{font:700 10.5px/16px var(--ui);padding:0 6px;border-radius:4px;background:var(--text);color:var(--surface);flex:none;overflow:visible!important}
+.row.mainrow{border-bottom:3px double var(--line);background:var(--surface2)}
+.card.mainrow{border-style:dashed;border-left-style:solid}
+.defl{margin-top:4px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.chg{padding:0 6px;border-radius:4px;font-size:11px;font-weight:700;background:var(--wait-tint);color:var(--wait-line)}
+.kind{display:inline-block;padding:0 8px;height:20px;line-height:20px;border-radius:5px;font-size:11.5px;font-weight:700;background:var(--surface2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.kind.ai{background:var(--primary-bg);color:var(--primary);box-shadow:none}
+.what{display:flex;align-items:center;gap:8px;min-width:0}
+.what .lb{color:var(--muted);font-size:12px;white-space:nowrap}
+.what code{white-space:nowrap}
+.ph-note{margin-top:16px;max-width:1040px;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:12px 14px}
+.ph-note h3{font-size:13px;margin-bottom:6px}
+.ph-note p{color:var(--muted);font-size:12px;margin-top:8px}
+.ph-note dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}
+.ph-note dd{margin:0;color:var(--muted)}
+
+/* ===== v2: grouped compact list ===== */
+#alert{display:flex;align-items:center;gap:8px;flex:none}
+kbd{font:600 10px/14px var(--ui);padding:0 4px;border-radius:4px;border:1px solid var(--line);color:var(--faint);background:var(--surface2);flex:none}
+.btn kbd{margin-left:2px}
+.list-h .btn{width:auto}
+.gh{display:flex;align-items:center;gap:6px;height:24px;padding:0 12px;font-size:11.5px;font-weight:700;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--line2)}
+.gh small{font-weight:600;color:var(--faint)}
+.gh.g-need{color:var(--wait-line)}
+.gh.g-need small{color:var(--wait-fg);background:var(--wait);border-radius:8px;padding:0 6px}
+.r2{display:block;width:100%;height:56px;padding:7px 8px 7px 9px;border-left:3px solid transparent;border-bottom:1px solid var(--line2)}
+.r2:hover{background:var(--surface2)}
+.r2[aria-selected=true]{background:var(--primary-bg);box-shadow:inset 0 0 0 1px var(--primary)}
+.r2 .a,.r2 .b{display:flex;align-items:center;gap:6px;height:20px;min-width:0}
+.r2 .b{margin-top:2px;font-size:12px}
+.r2 .b .il{flex:1 1 auto;min-width:64px}
+.r2 kbd{width:16px;padding:0;text-align:center}
+.r2 kbd.no{visibility:hidden}
+.r2.k-wait{border-left-color:var(--wait)}
+.r2.k-fail{border-left-color:var(--fail)}
+.r2.k-rc{border-left-color:var(--primary)}
+.r2.k-merge{border-left-color:var(--ok)}
+.r2.k-merged .bt-title,.r2.k-merged .il .t{color:var(--muted)}
+.r2.mainrow{height:36px;border-bottom:1px solid var(--line);background:var(--surface2)}
+.r2.mainrow[aria-selected=true]{background:var(--primary-bg)}
+.r2 .pth{color:var(--faint);font-size:11px;white-space:nowrap}
+.memo{display:inline-flex;align-items:center;gap:3px;flex:0 1 auto;min-width:0;max-width:42%;color:var(--faint);font-size:11.5px}
+.memo span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phr{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:10px;font:700 11.5px/20px var(--ui);white-space:nowrap;flex:none}
+.phr.k-wait{background:var(--wait);color:var(--wait-fg);box-shadow:0 0 0 3px color-mix(in srgb,var(--wait) 28%,transparent)}
+.phr.k-fail{background:var(--fail);color:var(--surface)}
+.phr.k-rc{background:var(--primary);color:var(--on-primary)}
+.phr.k-merge{background:var(--ok);color:var(--surface)}
+.phr.k-run{padding:0 2px;color:var(--run)}
+.phr.k-ci,.phr.k-rev{padding:0 2px;color:var(--muted);font-weight:600}
+.phr.k-merged{padding:0 2px;color:var(--faint);font-weight:600}
+.pm{display:inline-flex;align-items:center;gap:4px;height:18px;padding:0 6px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap;flex:none;color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.pm.none{box-shadow:none;color:var(--faint);font-weight:500;padding:0}
+.pm.open{color:var(--ok);background:var(--ok-tint);box-shadow:none}
+.pm.merged{color:var(--merged);background:var(--merged-tint);box-shadow:none}
+.pm .av{width:13px;height:13px;font-size:7px}
+.pm .spin{width:8px;height:8px}
+
+.acs{display:inline-flex;gap:3px;flex:none}
+.ac{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 5px;border-radius:10px;font:700 11px/20px var(--ui);white-space:nowrap;flex:none}
+.ac.wait{background:var(--wait);color:var(--wait-fg);box-shadow:0 0 0 2px color-mix(in srgb,var(--wait) 30%,transparent)}
+.ac.run{background:var(--run-tint);color:var(--run)}
+.ac.done{color:var(--faint);box-shadow:inset 0 0 0 1px var(--line)}
+.ac .dot{width:6px;height:6px;animation:pulse 1.4s ease-in-out infinite}
+.ac .spin{width:8px;height:8px}
+.r2 .bt-title{min-width:72px}
+.r2 .b .phr{height:18px;line-height:18px;font-size:11px;padding:0 7px}
+.r2 .b .phr.k-ci,.r2 .b .phr.k-rev,.r2 .b .phr.k-merged{padding:0}
+.stabs .s .ac{height:18px}
+.stabs .s[aria-selected=true] .ac.done{color:var(--term-dim);box-shadow:inset 0 0 0 1px var(--term-line)}
+.dh .top .acs{gap:5px}
+.tile .l1 .acs{gap:4px}
+.tile .l2 .phr{height:18px;line-height:18px;font-size:11px}
+
+/* ===== v2: terminal in the centre, info panel on the right ===== */
+.dh.v2{padding-bottom:10px}
+.dh.v2 .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+.dh.v2 .meta>*{flex:none}
+.dh.v2 .meta .il{flex:0 1 auto;min-width:80px}
+.dh.v2 .meta .chips{flex-wrap:nowrap}
+.acts.fit{flex-wrap:nowrap;position:relative}
+.acts.fit .act{flex:none;white-space:nowrap}
+.acts.fit .act.add{margin-left:auto}
+.more-wrap{position:relative;display:inline-flex;flex:none}
+.act.more{padding:0 8px}
+.more-menu{position:absolute;top:32px;right:0;z-index:20;display:grid;gap:2px;min-width:190px;padding:5px;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow)}
+.more-menu .mi{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:6px;font-weight:600;font-size:12.5px;white-space:nowrap}
+.more-menu .mi:hover{background:var(--surface2)}
+.more-menu .mi[disabled]{opacity:.42;cursor:not-allowed}
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 380px}
+.work.p-closed{grid-template-columns:minmax(0,1fr) 44px}
+.work.p-wide{grid-template-columns:320px minmax(0,1fr)}
+.work>.tw{min-width:0;min-height:0;height:auto}
+.stabs{gap:6px}
+.stabs .sc{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.stabs .s{flex:none;max-width:230px;white-space:nowrap}
+.stabs .s .t{overflow:hidden;text-overflow:ellipsis}
+.stabs .s .dot{flex:none}
+.stabs .sp{margin-left:0;flex:none}
+.pane .pt .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--line);background:var(--bg)}
+.ptabs{display:flex;align-items:center;gap:2px;padding:0 6px 0 4px;background:var(--surface);border-bottom:1px solid var(--line);height:35px;flex:none}
+.pt-l{display:flex;flex:1;min-width:0;height:100%}
+.pt-l button{display:flex;align-items:center;gap:5px;padding:0 9px;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;white-space:nowrap}
+.pt-l button[aria-selected=true]{color:var(--text);border-bottom-color:var(--primary)}
+.pc{width:26px;height:26px;display:grid;place-items:center;border-radius:6px;color:var(--muted);flex:none}
+.pc:hover{background:var(--surface2);color:var(--text)}
+.pbody{flex:1;min-height:0;overflow:auto;container-type:inline-size}
+.body{container-type:inline-size}
+.pstrip{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-left:1px solid var(--line);background:var(--surface)}
+.pstrip button{width:38px;padding:6px 0;border-radius:6px;font-size:10.5px;font-weight:600;color:var(--muted);text-align:center;display:grid;place-items:center}
+.pstrip button:hover{background:var(--surface2);color:var(--text)}
+.ovw{padding:4px 14px 20px}
+.ovw section{padding:12px 0;border-bottom:1px solid var(--line2)}
+.ovw section:last-child{border-bottom:0}
+.ovw h3{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.ovw .badge{background:var(--primary);color:var(--on-primary);border-radius:8px;padding:0 6px;font-size:11px;font-weight:700}
+.ovw .t1{font-weight:600;line-height:1.45;margin-bottom:6px}
+.ovw .bs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ovw .box2{margin:8px 0 0}
+.ovw .box2 .r{padding:5px 10px}
+.ovw .li,.ovw .sr{display:flex;align-items:center;gap:7px;width:100%;min-width:0;padding:4px 0}
+.ovw .sr{padding:5px 6px;margin:0 -6px;width:calc(100% + 12px);border-radius:6px}
+.ovw .sr:hover{background:var(--surface)}
+.ovw .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovw .v{color:var(--muted);font-size:12px;white-space:nowrap}
+.ovw .v.approved{color:var(--ok);font-weight:700}
+.ovw .v.commented{color:var(--primary);font-weight:700}
+.ovw .rvl{margin-top:8px}
+.ovw .rci{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:6px 0}
+.ovw .rci .mono{color:var(--muted);font-size:11px}
+.ovw .rci p{margin-top:2px;line-height:1.55}
+.memo-in{font:inherit;color:var(--text);width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.widen{margin-bottom:10px}
+.dsum{flex-wrap:wrap}
+@container (max-width:640px){
+  .page{grid-template-columns:minmax(0,1fr);gap:4px;padding:12px 12px 20px}
+  .page .side{border-top:1px solid var(--line);padding-top:12px}
+  .box2,.ev{margin-left:0}
+  .cm{grid-template-columns:minmax(0,1fr)}
+  .cm>.av{display:none}
+  .ph h2{font-size:15px}
+  .sub{padding:0 8px}
+  .dwrap{padding:10px 10px 20px}
+  .dl{grid-template-columns:30px 30px minmax(0,1fr)}
+  .rc{padding-left:12px}
+  .empty{min-height:220px;padding:16px}
+}
+
+/* ===== v2: tiles ===== */
+.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tiles.roomy{grid-auto-rows:minmax(300px,calc((100vh - 46px - 36px)/2))}
+.tiles.dense{grid-auto-rows:minmax(232px,calc((100vh - 46px - 48px)/3))}
+.tile .l2{display:flex;align-items:center;gap:6px;font-size:12px}
+.tile .l2 .il{flex:1}
+.tiles.dense .tile .term{font-size:11.5px;line-height:1.5}
+.tile.g-need{border-color:transparent}
+.tile.k-wait{box-shadow:0 0 0 2px var(--wait)}
+.tile.k-wait .th{background:var(--wait-tint)}
+.tile.k-fail{box-shadow:0 0 0 2px var(--fail)}
+.tile.k-fail .th{background:var(--fail-tint)}
+.tile.k-rc{box-shadow:0 0 0 2px var(--primary)}
+.tile.k-rc .th{background:var(--primary-bg)}
+.tile.k-merge{box-shadow:0 0 0 2px var(--ok)}
+.tile.k-merge .th{background:var(--ok-tint)}
+.tile.g-done{opacity:.7}
+@media (max-width:1300px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+@media (max-width:1240px){
+  .r2 .memo{display:none}
+  .work{grid-template-columns:minmax(0,1fr) 340px}
+  .work.p-wide{grid-template-columns:240px minmax(0,1fr)}
+  .ld{grid-template-columns:300px minmax(0,1fr)}
+  .ld.wide{grid-template-columns:370px minmax(0,1fr)}
+  .page{grid-template-columns:minmax(0,1fr) 180px;gap:14px}
+  .seg button{padding:0 9px}
+  .brand span,.alert .ex{display:none}
+}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="bar">
+    <div class="brand"><i><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2v8a3 3 0 0 0 3 3h5M4 6h5a3 3 0 0 1 3 3"/></svg></i><span>github-mate</span></div>
+    <div class="repo">
+      <button class="repo-btn" data-act="repo-menu" aria-haspopup="true" id="repoBtn"></button>
+      <div class="repo-menu" id="repoMenu" hidden></div>
+    </div>
+    <div class="seg" role="group" aria-label="レイアウト" id="seg"></div>
+    <div class="grow"></div>
+    <div id="alert"></div>
+    <button class="btn pri" data-act="new"><span aria-hidden="true">＋</span>新しい worktree</button>
+  </header>
+  <nav class="rail" id="rail" aria-label="一覧の切り替え"></nav>
+  <main id="main"></main>
+</div>
+
+<div class="ov" id="dlgOv" hidden><div class="dlg" role="dialog" aria-modal="true" id="dlg"></div></div>
+
+<div class="set" id="setOv" hidden>
+  <header class="bar">
+    <button class="btn" data-act="set-close">← 戻る</button>
+    <b>設定</b>
+  </header>
+  <div class="set-b">
+    <nav class="set-nav">
+      <div class="on">AI とアクションボタン</div>
+      <div>リポジトリ</div>
+      <div>GitHub アカウント</div>
+      <small>このモックで中身があるのは「AI とアクションボタン」だけです。</small>
+    </nav>
+    <div class="set-c" id="setC"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= icons ================= */
+const sv = (d, w) => '<svg width="' + (w || 14) + '" height="' + (w || 14) + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const P = {
+  folder: '<path d="M1.5 4.5v8h13v-7h-6l-1.5-2h-5.5z"/>',
+  claude: '<path d="M8 1.5v13M1.5 8h13M3.4 3.4l9.2 9.2M12.6 3.4l-9.2 9.2"/>',
+  codex: '<path d="M8 1.5l5.6 3.25v6.5L8 14.5l-5.6-3.25v-6.5z"/><path d="M6 6.5L4.8 8 6 9.5M10 6.5L11.2 8 10 9.5"/>',
+  agy: '<path d="M8 2l5.5 11.5H2.5z"/><path d="M5.5 10h5"/>',
+  build: '<path d="M9.5 2.5l4 4-2 2-4-4zM8 6l-6 6 2 2 6-6"/>',
+  test: '<path d="M6 1.5h4M6.5 1.5v4.5l-4 7a1 1 0 0 0 .9 1.5h9.2a1 1 0 0 0 .9-1.5l-4-7V1.5"/><path d="M4.5 10.5h7"/>',
+  issue: '<circle cx="8" cy="8" r="6.2"/><circle cx="8" cy="8" r="1.2"/>',
+  review: '<path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>',
+  code: '<path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/>',
+  term: '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4.5 6l2 2-2 2M8.5 10.5h3"/>',
+  gear: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"/>',
+  branch: '<circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="12" cy="5.5" r="1.5"/><path d="M4 5v6M12 7c0 3-8 1.5-8 4"/>',
+  pr: '<circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="12" cy="12.5" r="1.5"/><path d="M4 5v6M12 11V7a2 2 0 0 0-2-2H8M9.5 3.5L8 5l1.5 1.5"/>',
+  check: '<path d="M3 8.5l3.2 3.2L13 5"/>',
+  x: '<path d="M4 4l8 8M12 4l-8 8"/>',
+  caret: '<path d="M4 6l4 4 4-4"/>',
+  list: '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M6 2.5v11"/>',
+  grid: '<rect x="1.5" y="2.5" width="5.5" height="4.8" rx="1"/><rect x="9" y="2.5" width="5.5" height="4.8" rx="1"/><rect x="1.5" y="8.7" width="5.5" height="4.8" rx="1"/><rect x="9" y="8.7" width="5.5" height="4.8" rx="1"/>',
+  board: '<rect x="1.5" y="2.5" width="3.4" height="11" rx="1"/><rect x="6.3" y="2.5" width="3.4" height="7" rx="1"/><rect x="11.1" y="2.5" width="3.4" height="9" rx="1"/>',
+  split: '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M8 2.5v11"/>',
+  grip: '<path d="M6 4v.01M10 4v.01M6 8v.01M10 8v.01M6 12v.01M10 12v.01"/>',
+  trash: '<path d="M2.5 4.5h11M6 4.5v-2h4v2M4 4.5l.7 9h6.6l.7-9M6.7 7v4M9.3 7v4"/>',
+  note: '<path d="M3 13l.6-2.8 7.2-7.2 2.2 2.2-7.2 7.2zM9.6 4.2l2.2 2.2"/>',
+  more: '<path d="M3.5 8v.01M8 8v.01M12.5 8v.01" stroke-width="2.4"/>',
+  wide: '<path d="M6.5 3.5L2 8l4.5 4.5M2 8h12"/>',
+  narrow: '<path d="M9.5 3.5L14 8l-4.5 4.5M14 8H2"/>',
+  close: '<path d="M5 3.5L9.5 8 5 12.5M10.5 3.5L15 8l-4.5 4.5" transform="translate(-2 0)"/>'
+};
+const IC = {}; Object.keys(P).forEach(k => { IC[k] = sv(P[k]); });
+const ic = (k, w) => sv(P[k], w);
+
+/* ================= fake data ================= */
+const lines = s => s.replace(/^\n/, '').replace(/\n$/, '').split('\n');
+const ME = 'hinata';
+const HUE = { hinata: 225, 'sato-k': 20, mtanaka: 150, 'yuki-h': 300, okabe: 80, 'ai-review[bot]': 180 };
+const LABEL_HUE = { bug: 0, enhancement: 190, refactor: 265, 'good first issue': 280, performance: 35, frontend: 215, backend: 130, docs: 60, security: 340 };
+
+const AIS = {
+  claude: { name: 'Claude Code', cmd: 'claude --dangerously-skip-permissions', def: 'claude' },
+  codex: { name: 'Codex', cmd: 'codex --yolo', def: 'codex' },
+  agy: { name: 'Antigravity', cmd: 'agy', def: 'agy' }
+};
+const ALL = 'すべてのリポジトリ';
+const ACTIONS = [
+  { ic: 'folder', name: 'フォルダを開く', kind: 'cmd', cmd: 'xdg-open {{worktree.path}}', scope: ALL },
+  { ic: 'code', name: 'VS Code', kind: 'cmd', cmd: 'code {{worktree.path}}', scope: ALL },
+  { ic: 'claude', name: 'Claude Code', kind: 'ai', ai: 'claude', cmd: '', scope: ALL },
+  { ic: 'codex', name: 'Codex', kind: 'ai', ai: 'codex', cmd: '', scope: ALL },
+  { ic: 'agy', name: 'Antigravity', kind: 'ai', ai: 'agy', cmd: '', scope: ALL },
+  { ic: 'issue', name: 'Issue を実装', kind: 'ai', ai: 'claude', cmd: '{{issue.url}} を実装して', scope: ALL },
+  { ic: 'review', name: 'PR をレビュー', kind: 'ai', ai: 'codex', cmd: 'PR #{{pr.number}} をレビューして', scope: ALL },
+  { ic: 'build', name: 'ビルド', kind: 'cmd', cmd: 'pnpm build', scope: 'acme/webapp' },
+  { ic: 'test', name: 'テスト', kind: 'cmd', cmd: 'pnpm test', scope: 'acme/webapp' },
+  { ic: 'build', name: 'ビルド', kind: 'cmd', cmd: 'cargo build', scope: 'acme/api-server' },
+  { ic: 'test', name: 'テスト', kind: 'cmd', cmd: 'cargo test', scope: 'acme/api-server' }
+];
+const actionsHere = () => ACTIONS.filter(a => a.scope === ALL || a.scope === S.repo);
+const fullCmd = a => a.kind === 'ai' ? AIS[a.ai].cmd + (a.cmd ? ' "' + a.cmd + '"' : '') : a.cmd;
+
+const REPOS = {
+  'acme/webapp': {
+    dir: '~/dev/webapp',
+    issues: [
+      { id: 214, title: '検索結果のページネーションが2ページ目で重複する', labels: ['bug', 'backend'], author: 'sato-k', opened: '2日前',
+        body: '<p>検索結果の2ページ目に、1ページ目の末尾にあった項目がもう一度出ることがあります。</p><p><b>再現手順</b></p><ul><li>「請求」で検索する（スコアが同じ項目が多い）</li><li>2ページ目に進む</li><li>1ページ目の 19〜20 件目と同じ項目が先頭に出る</li></ul><p><b>期待する動作</b>：どの項目も1回だけ出る。</p>',
+        comments: [['mtanaka', '2日前', '<p>本番でも再現しました。スコアが同点の項目が多い検索語でだけ起きるようです。</p>'], [ME, '1日前', '<p><code>ORDER BY</code> が安定していないのが原因に見えます。調べます。</p>']] },
+      { id: 198, title: 'CSV エクスポートが大きいデータでタイムアウトする', labels: ['bug', 'performance'], author: 'mtanaka', opened: '6日前',
+        body: '<p>10万行を超えるデータで CSV エクスポートを実行すると、30秒でタイムアウトして 504 が返ります。</p><p>全行をメモリに載せてから文字列化しているのが原因だと思います。ストリーミングで返すようにしたいです。</p>',
+        comments: [['sato-k', '5日前', '<p>顧客から問い合わせが来ているので優先度高めでお願いします。</p>']] },
+      { id: 209, title: '設定画面にダークモードの切り替えを追加', labels: ['enhancement', 'frontend'], author: ME, opened: '3日前',
+        body: '<p>設定画面の「表示」に、ライト / ダーク / システムに合わせる の3択を追加する。</p><ul><li>選択は <code>localStorage</code> に保存する</li><li>既定は「システムに合わせる」</li></ul><p>色の切り替え方は2案あるので、両方実装して比べる。</p>',
+        comments: [['yuki-h', '2日前', '<p>デザインは Figma の「Settings / Appearance」にあります。</p>'], [ME, '昨日', '<p>案A（CSS 変数を <code>data-theme</code> で切り替え）を #221、案B（<code>light-dark()</code>）を #224 に出しました。</p>']] },
+      { id: 187, title: '通知メールのテンプレートを React Email に移行', labels: ['refactor'], author: 'yuki-h', opened: '9日前',
+        body: '<p>Handlebars で書いている通知メール 6 種類を React Email に移行する。プレビューとテストがしやすくなる。</p>',
+        comments: [['mtanaka', '4日前', '<p>件名の文言は変えないでください。フィルタを設定しているユーザーがいます。</p>']] },
+      { id: 203, title: 'ログイン後のリダイレクト先を保持する', labels: ['enhancement', 'security'], author: 'sato-k', opened: '5日前',
+        body: '<p>未ログインで <code>/orders/123</code> を開くとログイン画面に飛ぶが、ログイン後にトップへ戻されてしまう。元の URL に戻したい。</p><p>外部 URL へのリダイレクトにならないよう検証が必要。</p>',
+        comments: [['sato-k', '4日前', '<p><code>//evil.example</code> のような形式も弾いてください。</p>']] },
+      { id: 225, title: 'メンバーを一括で招待できるようにする', labels: ['enhancement'], author: 'yuki-h', opened: '4日前', assignee: 'yuki-h',
+        body: '<p>メールアドレスを貼り付けて、最大 100 人まで一度に招待できるようにする。</p>', comments: [] },
+      { id: 222, title: '注文一覧の絞り込み条件を URL に保存する', labels: ['enhancement', 'frontend'], author: 'yuki-h', opened: '3時間前',
+        body: '<p>絞り込んだ状態の一覧を URL で共有できるようにしたい。リロードしても条件が残るようにする。</p>', comments: [] },
+      { id: 220, title: 'セッション切れのときにエラー画面ではなくログイン画面へ遷移させる', labels: ['bug'], author: 'mtanaka', opened: '昨日', assignee: null, sug: 'fix/220-session-expired',
+        body: '<p>セッションが切れた状態で操作すると「予期しないエラー」と表示される。401 のときはログイン画面に遷移させる。</p>', comments: [] },
+      { id: 218, title: 'Node.js 22 に上げる', labels: ['refactor'], author: ME, opened: '2日前', assignee: null, sug: 'chore/218-node-22',
+        body: '<p>Node.js 20 のサポート終了に備えて 22 に上げる。CI と Dockerfile、<code>.nvmrc</code> を更新する。</p>', comments: [] },
+      { id: 216, title: 'README のセットアップ手順が古い', labels: ['docs', 'good first issue'], author: 'okabe', opened: '2日前', assignee: null, sug: 'docs/216-readme-setup',
+        body: '<p>README では yarn を使う手順になっているが、いまは pnpm。</p>', comments: [] },
+      { id: 192, title: 'プロフィール画像のアップロードで EXIF の向きを反映', labels: ['bug'], author: 'okabe', opened: '12日前', state: 'closed',
+        body: '<p>iPhone で縦に撮った写真をプロフィール画像にすると、横向きで表示される。</p>', comments: [['yuki-h', '8日前', '<p>確認しました。直っています。</p>']] }
+    ],
+    prs: [
+      { num: 219, issue: 198, branch: 'fix/198-csv-export-timeout', title: 'CSV エクスポートをストリーミングに変更', author: ME, state: 'open', ci: 'fail', review: 'none', reviewers: [], commits: [['a41c9e2', 'CSV をストリームで書き出す'], ['7be03d1', 'エクスポートの結合テストを追加']] },
+      { num: 221, issue: 209, branch: 'feat/209-dark-mode-css-vars', title: 'ダークモードの切り替え（案A：CSS 変数を data-theme で切り替える）', author: ME, state: 'draft', ci: 'ok', review: 'none', reviewers: [], commits: [['c0ffee1', 'テーマの設定値と ThemeProvider を追加']] },
+      { num: 224, issue: 209, branch: 'feat/209-dark-mode-light-dark', title: 'ダークモードの切り替え（案B：light-dark() を使う）', author: ME, state: 'draft', ci: 'run', review: 'none', reviewers: [], commits: [['5d01f3e', 'color-scheme と light-dark() で色を定義'], ['b22e9a4', '設定画面にセグメントを追加']] },
+      { num: 215, issue: 187, branch: 'refactor/187-react-email', title: '通知メールを React Email に移行', author: ME, state: 'open', ci: 'ok', review: 'approved', reviewers: [['mtanaka', 'approved']], commits: [['91d2b7a', 'React Email を導入'], ['3f8a6c0', '招待メールを移行'], ['e7715bd', 'パスワード再設定メールを移行']] },
+      { num: 217, issue: 203, branch: 'feat/203-keep-redirect', title: 'ログイン後に元のページへ戻す', author: ME, state: 'open', ci: 'ok', review: 'commented', rc: 3, rcList: [['sato-k', 'src/auth/redirect.ts:4', 'バックスラッシュで始まる形式もブラウザによっては外部扱いになります。テストに足してもらえますか。'], ['ai-review[bot]', 'src/auth/redirect.ts:6', 'location.origin を直接参照しているので、SSR では例外になります。origin を引数で受け取る形を検討してください。'], ['ai-review[bot]', 'src/pages/login.tsx:31', 'next をクエリから取り出すときに decodeURIComponent が二重にかかっています。']], reviewers: [['sato-k', 'commented'], ['mtanaka', 'requested'], ['ai-review[bot]', 'commented']], commits: [['08ac4d7', 'next パラメータを保持する'], ['d3e91f2', 'オープンリダイレクトを防ぐ検証を追加']] },
+      { num: 226, issue: 225, branch: 'feat/225-bulk-invite', title: 'メンバーの一括招待を追加', author: 'yuki-h', state: 'open', ci: 'ok', review: 'requested', reviewers: [[ME, 'requested']], commits: [['e19a0c3', '一括招待の API を追加'], ['77b2d15', '招待ダイアログに貼り付け欄を追加']] },
+      { num: 229, issue: 222, branch: 'feat/222-orders-filter-url', title: '注文一覧の絞り込み条件を URL に保存する', author: ME, state: 'open', ci: 'ok', review: 'requested', reviewers: [['mtanaka', 'requested']], commits: [['b7d4410', '絞り込み条件を URL のクエリと同期する']] },
+      { num: 227, issue: null, branch: 'feat/orders-csv-tax-rate', title: '注文一覧の CSV に税率の列を追加', author: 'sato-k', state: 'open', ci: 'ok', review: 'requested', reviewers: [[ME, 'requested']], commits: [['2c4e6a8', '税率の列を追加']],
+        diff: [{ path: 'src/server/export/columns.ts', add: 1, del: 0, lines: lines(`
+@@ -14,6 +14,7 @@ export const ORDER_COLUMNS = [
+   { key: "subtotal", label: "小計" },
++  { key: "taxRate", label: "税率" },
+   { key: "tax", label: "消費税" },
+   { key: "total", label: "合計" },
+ ];`) }] },
+      { num: 213, issue: null, branch: 'chore/update-deps-oct', title: '依存パッケージを更新（10月分）', author: 'okabe', state: 'open', ci: 'run', review: 'none', reviewers: [], commits: [['f0e1d2c', 'pnpm update']], diff: [] },
+      { num: 212, issue: 192, branch: 'fix/192-exif-orientation', title: 'アップロード時に EXIF の向きを反映する', author: ME, state: 'merged', ci: 'ok', review: 'approved', reviewers: [['yuki-h', 'approved']], commits: [['6a7b8c9', 'sharp の rotate() を通す'], ['1f2e3d4', '向き 1〜8 のテスト画像を追加']] }
+    ],
+    wts: [
+      { branch: 'main', main: true, issue: null, pr: null, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'zsh' }],
+        cursor: true,
+        term: lines(`
+$|~/dev/webapp $ git pull --ff-only
+o|Updating 3e1f0aa..9b7c2d4
+o|Fast-forward
+o| src/server/upload/avatar.ts | 1 +
+o| 1 file changed, 1 insertion(+)
+$|~/dev/webapp $ git worktree list
+o|~/dev/webapp                                              9b7c2d4 [main]
+o|~/dev/webapp.worktrees/fix-214-search-pagination-dup     9b7c2d4 [fix/214-search-pagination-dup]
+o|~/dev/webapp.worktrees/fix-198-csv-export-timeout        7be03d1 [fix/198-csv-export-timeout]
+d|  （以下 6 件）
+$|~/dev/webapp $ `),
+        diff: [] },
+      { branch: 'fix/214-search-pagination-dup', issue: 214, pr: null, dirty: 2, unpushed: 0, remote: false,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'wait', btn: 'Issue を実装', role: '実装' },
+          { n: 'Claude Code', ai: 1, st: 'run', btn: 'Issue を実装', role: '実装', term: lines(`
+u|> 検索結果のページ送りの E2E テストを Playwright で追加して。同点スコアのデータで 3 ページ分
+a|既存の E2E テストの構成を確認します。
+t|Read(e2e/search.spec.ts)
+o|58 行を読み込み
+t|Write(e2e/fixtures/same-score.ts)
+o|+22 行
+t|Update(e2e/search.spec.ts)
+o|+31 行
+t|Bash(pnpm playwright test e2e/search.spec.ts)
+s|✻ Running… (48s · ↓ 2.1k tokens · esc で中断)`) },
+          { n: 'pnpm dev' }],
+        cursor: true,
+        term: lines(`
+d|Claude Code   ~/dev/webapp.worktrees/fix-214-search-pagination-dup
+|
+u|> https://github.com/acme/webapp/issues/214 を実装して
+a|検索 API のページネーション処理を確認します。
+t|Read(src/server/search/query.ts)
+o|142 行を読み込み
+t|Bash(pnpm vitest run src/server/search)
+o|Test Files  3 passed (3)   Tests  12 passed (12)
+a|原因が分かりました。ORDER BY score DESC だけだと同点の行の順序が決まらず、OFFSET の境界で同じ行が2回返ります。id を第2ソートキーに追加します。
+t|Update(src/server/search/query.ts)
+m|  47 -    .orderBy(desc(items.score))
+p|  47 +    .orderBy(desc(items.score), asc(items.id))
+t|Write(src/server/search/query.test.ts)
+o|同点スコア 40 件で 1〜2 ページを取得する再現テストを追加（+9 行）
+t|Bash(pnpm vitest run src/server/search)
+o|Test Files  3 passed (3)   Tests  13 passed (13)
+a|修正しました。同点スコアの行が 2 ページにまたがっても重複しないことをテストで確認しています。
+a|dev サーバー（http://localhost:5174/）で「請求」を検索して、2 ページ目を確認してください。問題なければコミットして PR を作成します。
+|
+u|> `),
+        diff: [
+          { path: 'src/server/search/query.ts', add: 2, del: 1, lines: lines(`
+@@ -44,7 +44,8 @@ export async function searchItems(q: SearchQuery) {
+     .select()
+     .from(items)
+     .where(matchQuery(q.text))
+-    .orderBy(desc(items.score))
++    // 同点の行の順序を固定する（#214）
++    .orderBy(desc(items.score), asc(items.id))
+     .limit(q.pageSize)
+     .offset((q.page - 1) * q.pageSize);
+ `) },
+          { path: 'src/server/search/query.test.ts', add: 9, del: 0, lines: lines(`
+@@ -88,3 +88,12 @@ describe("searchItems", () => {
+     expect(res.items).toHaveLength(20);
+   });
++
++  it("同点スコアでもページ間で重複しない", async () => {
++    await seedItems(40, { score: 1 });
++    const p1 = await searchItems({ text: "請求", page: 1, pageSize: 20 });
++    const p2 = await searchItems({ text: "請求", page: 2, pageSize: 20 });
++    const ids = [...p1.items, ...p2.items].map((i) => i.id);
++    expect(new Set(ids).size).toBe(40);
++  });
+ });`) }
+        ] },
+      { branch: 'fix/198-csv-export-timeout', issue: 198, pr: 219, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }, { n: 'pnpm test --watch' }],
+        term: lines(`
+u|> コミットして PR を作成して
+t|Bash(git commit -am "CSV をストリームで書き出す")
+o|[fix/198-csv-export-timeout a41c9e2] CSV をストリームで書き出す
+t|Bash(git push -u origin fix/198-csv-export-timeout)
+o|branch 'fix/198-csv-export-timeout' set up to track 'origin/fix/198-csv-export-timeout'.
+t|Bash(gh pr create --fill)
+o|https://github.com/acme/webapp/pull/219
+a|PR #219 を作成しました。CI の結果が出たら確認してください。
+d|
+d|セッションを終了しました（13:05）`),
+        diff: [{ path: 'src/server/export/csv.ts', add: 10, del: 3, lines: lines(`
+@@ -22,6 +22,13 @@ export async function exportCsv(res: Response, filter: Filter) {
+-  const rows = await db.select().from(orders).where(toWhere(filter));
+-  res.setHeader("Content-Type", "text/csv");
+-  res.send(toCsv(rows));
++  res.setHeader("Content-Type", "text/csv; charset=utf-8");
++  res.write(BOM + header.join(",") + EOL);
++  let cursor: number | undefined;
++  for (;;) {
++    const rows = await fetchBatch(filter, cursor, BATCH);
++    if (rows.length === 0) break;
++    res.write(rows.map(toLine).join(EOL) + EOL);
++    cursor = rows[rows.length - 1].id;
++  }
++  res.end();
+ }`), comment: { at: 7, thread: [['sato-k', '3時間前', 'ここ、クライアントが途中で切断したときにループが回り続けませんか？ <code>res.closed</code> を見て抜けたほうがよさそうです。'], [ME, '2時間前', '確かに。次のコミットで対応します。']] } }] },
+      { branch: 'feat/209-dark-mode-css-vars', issue: 209, pr: 221, dirty: 4, unpushed: 1,
+        sessions: [{ n: 'Codex', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' },
+          { n: 'Codex', ai: 1, st: 'run', btn: 'PR をレビュー', role: 'レビュー', term: lines(`
+d|OpenAI Codex   feat/209-dark-mode-css-vars
+|
+u|› PR #221 をレビューして
+a|• main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|17 files changed, 96 insertions(+), 41 deletions(-)
+a|• これまでに見つかった点
+a|  1. [要修正] tokens.css:9  ダーク側に --text-muted の定義がない。ライトの値がそのまま使われ、コントラストが足りない。
+a|  2. [提案] ThemeProvider.tsx:18  初回描画の前に data-theme を付けていないので、リロード時に一瞬ライトで表示される。
+t|Read src/components/Modal.tsx
+s|◓ Working (52s)  esc で中断`) },
+          { n: 'pnpm dev' }],
+        term: lines(`
+d|OpenAI Codex   feat/209-dark-mode-css-vars
+|
+u|› 色を直接書いているコンポーネントを CSS 変数に置き換えて
+a|• ThemeProvider は追加済みなので、既存コンポーネントの置き換えに取りかかります。
+t|Ran rg "#[0-9a-f]{6}" src/components --files-with-matches
+o|14 ファイル
+t|Edited src/styles/tokens.css (+26 -4)
+o|[data-theme="dark"] の変数を定義
+t|Ran pnpm tsc --noEmit
+o|エラーなし
+a|• 14 ファイル中 9 ファイルを置き換えました。
+t|Edited src/components/Card.tsx (+2 -2)
+t|Edited src/components/Modal.tsx (+5 -5)
+a|• 14 ファイルすべての置き換えが終わりました。型チェックとテストは通っています。
+t|Ran git commit -am "色の指定を CSS 変数に置き換え" && git push
+o|c0ffee1..d41a2b7  feat/209-dark-mode-css-vars -> feat/209-dark-mode-css-vars
+d|
+d|セッションを終了しました（14:20）`),
+        diff: [
+          { path: 'src/styles/tokens.css', add: 5, del: 0, lines: lines(`
+@@ -6,3 +6,8 @@
+   --surface: #ffffff;
+   --line: #e2e5ea;
+ }
++
++[data-theme="dark"] {
++  --surface: #1c2028;
++  --line: #313846;
++}`) },
+          { path: 'src/components/Card.tsx', add: 2, del: 2, lines: lines(`
+@@ -8,8 +8,8 @@ const card = css({
+   borderRadius: 8,
+-  background: "#ffffff",
+-  border: "1px solid #e2e5ea",
++  background: "var(--surface)",
++  border: "1px solid var(--line)",
+   padding: 16,
+ });`) }
+        ] },
+      { branch: 'feat/209-dark-mode-light-dark', issue: 209, pr: 224, dirty: 0, unpushed: 0,
+        memo: '案B。案A（#221）と見比べてから決める',
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }, { n: 'Codex', ai: 1, st: 'done', btn: 'PR をレビュー', role: 'レビュー' }, { n: 'pnpm dev' }],
+        term: lines(`
+u|> Issue #209 を light-dark() を使う方法で実装して、Draft の PR を作って
+a|color-scheme と light-dark() で色を定義し、data-theme で color-scheme だけを切り替える形にします。
+t|Update(src/styles/tokens.css)
+o|+6 行、−2 行
+t|Write(src/features/settings/AppearanceSection.tsx)
+o|+24 行
+t|Bash(pnpm vitest run src/features/settings)
+o|Tests  5 passed (5)
+t|Bash(gh pr create --draft --fill)
+o|https://github.com/acme/webapp/pull/224
+a|Draft の PR #224 を作成しました。案A（#221）と比べると変更は 3 ファイルで済みますが、light-dark() は Safari 17.5 未満で使えません。
+d|
+d|セッションを終了しました（昨日 16:40）`),
+        diff: [{ path: 'src/styles/tokens.css', add: 5, del: 2, lines: lines(`
+@@ -4,5 +4,8 @@
+ :root {
+-  --surface: #ffffff;
+-  --line: #e2e5ea;
++  color-scheme: light dark;
++  --surface: light-dark(#ffffff, #1c2028);
++  --line: light-dark(#e2e5ea, #313846);
+ }
++:root[data-theme="light"] { color-scheme: light; }
++:root[data-theme="dark"] { color-scheme: dark; }`) }] },
+      { branch: 'feat/225-bulk-invite', issue: 225, pr: 226, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Codex', ai: 1, st: 'run', btn: 'PR をレビュー', role: 'レビュー' }, { n: 'pnpm dev' }],
+        term: lines(`
+d|OpenAI Codex   feat/225-bulk-invite（yuki-h の PR #226）
+|
+u|› PR #226 をレビューして
+a|• main との差分を確認します。
+t|Ran git diff main...HEAD --stat
+o|7 files changed, 212 insertions(+), 18 deletions(-)
+t|Read src/server/invite/bulk.ts
+a|• これまでに見つかった点
+a|  1. [要修正] bulk.ts:41  重複を除く前に上限 100 件を確認している。重複込みで 101 件あると、実際は 100 件以下でも拒否される。
+a|  2. [要修正] bulk.ts:58  招待の INSERT をループの中で 1 件ずつ実行していて、トランザクションがない。途中で失敗すると一部だけ送信済みになる。
+a|  3. [提案] BulkInviteDialog.tsx:22  貼り付けた文字列を改行だけで分割している。カンマ区切りも受け付けたほうがよい。
+t|Ran pnpm vitest run src/server/invite
+o|Tests  6 passed (6)
+a|• テストは通っていますが、上限超過と重複のケースがありません。残りのファイルを確認します。
+s|◓ Working (1m 37s)  esc で中断`),
+        diff: [{ path: 'src/server/invite/bulk.ts', add: 9, del: 0, lines: lines(`
+@@ -36,3 +36,12 @@ export async function bulkInvite(teamId: string, raw: string[]) {
+   const team = await getTeam(teamId);
++  if (raw.length > MAX_INVITES) {
++    throw new BadRequest("一度に招待できるのは 100 人までです");
++  }
++  const emails = [...new Set(raw.map(normalizeEmail))];
++
++  for (const email of emails) {
++    await db.insert(invites).values({ teamId, email });
++    await sendInviteMail(team, email);
++  }
+ }`), comment: { at: 2, thread: [[ME, '下書き', '重複を除いてから上限を確認したほうがよさそうです。重複込みで 101 件のときに拒否されます。']] } }] },
+      { branch: 'refactor/187-react-email', issue: 187, pr: 215, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }, { n: 'Codex', ai: 1, st: 'done', btn: 'PR をレビュー', role: 'レビュー' }, { n: 'pnpm dev' }],
+        term: lines(`
+u|> レビューで言われた件名のスナップショットテストを全メールに追加して
+a|6 種類すべてに件名と HTML のスナップショットテストを追加します。
+t|Read(src/emails/__tests__/invite.test.tsx)
+o|34 行を読み込み
+t|Write(src/emails/__tests__/password-reset.test.tsx)
+o|+31 行
+t|Write(src/emails/__tests__/weekly-digest.test.tsx)
+o|+36 行
+t|Bash(pnpm vitest run src/emails -u)
+o|Snapshots  8 written
+a|残りは billing-failed と member-removed の 2 種類です。
+t|Write(src/emails/__tests__/billing-failed.test.tsx)
+o|+29 行
+t|Bash(pnpm vitest run src/emails)
+o|Tests  14 passed (14)
+t|Bash(git commit -am "件名のスナップショットテストを追加" && git push)
+o|e7715bd..4c09a1f  refactor/187-react-email -> refactor/187-react-email
+a|6 種類すべてにスナップショットテストを追加して push しました。
+d|
+d|セッションを終了しました（11:52）`),
+        diff: [
+          { path: 'src/emails/Invite.tsx', add: 8, del: 0, lines: lines(`
+@@ -0,0 +1,8 @@
++export function Invite({ inviter, team, url }: InviteProps) {
++  return (
++    <Layout preview={inviter + " さんから招待が届いています"}>
++      <Heading>{team} に参加しましょう</Heading>
++      <Button href={url}>招待を受ける</Button>
++    </Layout>
++  );
++}`) },
+          { path: 'src/emails/templates/invite.hbs', add: 0, del: 4, lines: lines(`
+@@ -1,4 +0,0 @@
+-{{> layout preview="招待が届いています"}}
+-<h1>{{team}} に参加しましょう</h1>
+-<a class="button" href="{{url}}">招待を受ける</a>
+-{{/layout}}`) }
+        ] },
+      { branch: 'feat/203-keep-redirect', issue: 203, pr: 217, dirty: 0, unpushed: 0,
+        memo: 'レビュー指摘の修正待ち',
+        sessions: [{ n: 'Antigravity', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }, { n: 'pnpm dev' }],
+        term: lines(`
+d|Antigravity CLI   feat/203-keep-redirect
+|
+u|> PR を作成して sato-k と mtanaka にレビューを依頼して
+a|変更を push して PR を作成します。
+t|run: git push -u origin feat/203-keep-redirect
+o|branch 'feat/203-keep-redirect' set up to track 'origin/feat/203-keep-redirect'.
+t|run: gh pr create --fill --reviewer sato-k,mtanaka
+o|https://github.com/acme/webapp/pull/217
+a|PR #217 を作成し、2 人にレビューを依頼しました。
+d|
+d|セッションを終了しました（14:32）`),
+        diff: [{ path: 'src/auth/redirect.ts', add: 9, del: 0, lines: lines(`
+@@ -0,0 +1,9 @@
++/** ログイン後の戻り先。同一オリジンのパスだけを許可する */
++export function safeNext(next: string | null): string {
++  if (!next) return "/";
++  if (!next.startsWith("/") || next.startsWith("//")) return "/";
++  try {
++    const u = new URL(next, location.origin);
++    return u.origin === location.origin ? u.pathname + u.search : "/";
++  } catch { return "/"; }
++}`), comment: { at: 4, thread: [['sato-k', '40分前', 'バックスラッシュで始まる形式（<code>/\\evil.example</code>）もブラウザによっては外部扱いになります。テストに足してもらえますか。']] } }] },
+      { branch: 'spike/virtual-list', issue: null, pr: null, dirty: 5, unpushed: 3, remote: false,
+        memo: '仮想スクロールの検証。Issue はまだ作らない',
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'run', btn: 'Claude Code', role: '実装' },
+          { n: 'Codex', ai: 1, st: 'run', btn: 'Codex', role: '実装', term: lines(`
+d|OpenAI Codex   spike/virtual-list
+|
+u|› 同じ表を react-window でも組んで、bench-orders-table で比べられるようにして
+a|• OrdersTableWindow.tsx として別コンポーネントで実装します。
+t|Ran pnpm add react-window
+o|+ react-window 1.8.11
+t|Edited src/features/orders/OrdersTableWindow.tsx (+64 -0)
+t|Edited scripts/bench-orders-table.tsx (+18 -3)
+o|--impl=virtual|window を追加
+t|Ran pnpm tsx scripts/bench-orders-table.tsx --impl=window
+s|◑ Working (1m 05s)  esc で中断`) },
+          { n: 'pnpm dev' }],
+        term: lines(`
+u|> 注文一覧を仮想スクロールにしたらどれくらい速くなるか試したい。@tanstack/react-virtual で雑に組んで
+a|OrdersTable を仮想スクロールに置き換えて、5,000 行で描画時間を比べます。
+t|Bash(pnpm add @tanstack/react-virtual)
+o|+ @tanstack/react-virtual 3.13.2
+t|Update(src/features/orders/OrdersTable.tsx)
+o|+38 行、−12 行
+t|Bash(pnpm tsx scripts/bench-orders-table.tsx)
+o|変更前  初回描画 1,840 ms / スクロール 22 fps
+o|変更後  初回描画   96 ms / スクロール 60 fps
+a|5,000 行で初回描画が約 19 倍速くなりました。ただし行の高さが可変のセル（メモ欄）で位置がずれるので、measureElement で実測する形に直します。
+t|Update(src/features/orders/OrdersTable.tsx)
+s|✻ Editing… (37s · ↓ 1.2k tokens · esc で中断)`),
+        diff: [{ path: 'src/features/orders/OrdersTable.tsx', add: 7, del: 3, lines: lines(`
+@@ -21,9 +21,13 @@ export function OrdersTable({ orders }: Props) {
++  const v = useVirtualizer({
++    count: orders.length,
++    getScrollElement: () => ref.current,
++    estimateSize: () => 44,
++  });
+   return (
+-    <tbody>
+-      {orders.map((o) => <OrderRow key={o.id} order={o} />)}
+-    </tbody>
++    <tbody style={{ height: v.getTotalSize() }}>
++      {v.getVirtualItems().map((i) => <OrderRow key={i.key} order={orders[i.index]} />)}
++    </tbody>
+   );`) }] },
+      { branch: 'feat/222-orders-filter-url', issue: 222, pr: 229, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }, { n: 'pnpm dev' }],
+        term: lines(`
+u|> コミットして PR を作成して、mtanaka にレビューを依頼して
+t|Bash(git commit -am "絞り込み条件を URL のクエリと同期する")
+o|[feat/222-orders-filter-url b7d4410] 絞り込み条件を URL のクエリと同期する
+t|Bash(gh pr create --fill --reviewer mtanaka)
+o|https://github.com/acme/webapp/pull/229
+a|PR #229 を作成し、mtanaka にレビューを依頼しました。
+d|
+d|セッションを終了しました（10:18）`),
+        diff: [{ path: 'src/features/orders/useOrderFilter.ts', add: 6, del: 1, lines: lines(`
+@@ -5,5 +5,10 @@ export function useOrderFilter() {
+-  const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER);
++  const [params, setParams] = useSearchParams();
++  const filter = useMemo(() => parseFilter(params), [params]);
++  const setFilter = useCallback(
++    (f: Filter) => setParams(toParams(f), { replace: true }),
++    [setParams],
++  );
+   return { filter, setFilter };
+ }`) }] },
+      { branch: 'fix/192-exif-orientation', issue: 192, pr: 212, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done', btn: 'Issue を実装', role: '実装' }],
+        term: lines(`
+u|> マージされたか確認して
+t|Bash(gh pr view 212 --json state -q .state)
+o|MERGED
+t|Bash(git fetch origin && git status -sb)
+o|## fix/192-exif-orientation...origin/fix/192-exif-orientation
+a|PR #212 はマージ済みで、未コミットの変更はありません。worktree とローカルブランチは削除して問題ない状態です。
+d|
+d|セッションを終了しました（昨日 18:05）`),
+        diff: [{ path: 'src/server/upload/avatar.ts', add: 1, del: 0, lines: lines(`
+@@ -18,6 +18,7 @@ export async function processAvatar(buf: Buffer) {
+   return sharp(buf)
++    .rotate() // EXIF の向きを反映
+     .resize(256, 256, { fit: "cover" })
+     .webp({ quality: 85 })
+     .toBuffer();`) }] }
+    ]
+  },
+  'acme/api-server': {
+    dir: '~/dev/api-server',
+    issues: [
+      { id: 88, title: 'レート制限をユーザー単位からトークン単位に変更', labels: ['enhancement', 'backend'], author: 'sato-k', opened: '4日前', body: '<p>API トークンごとに上限を持てるようにする。現状はユーザー単位なので、CI 用トークンが人間の操作を巻き込んで制限されてしまう。</p>', comments: [] },
+      { id: 91, title: '/v2/orders のレスポンスに通貨コードを追加', labels: ['enhancement'], author: 'mtanaka', opened: '2日前', body: '<p>多通貨対応のため、<code>/v2/orders</code> の各注文に <code>currency</code>（ISO 4217）を追加する。</p>', comments: [] },
+      { id: 93, title: 'Webhook の再送に指数バックオフを入れる', labels: ['enhancement', 'backend'], author: 'sato-k', opened: '昨日', assignee: null, sug: 'feat/93-webhook-backoff', body: '<p>いまは固定 30 秒間隔で 5 回再送している。相手が落ちているときに負荷をかけ続けてしまう。</p>', comments: [] },
+      { id: 92, title: 'sqlx を 0.9 に上げる', labels: ['refactor'], author: ME, opened: '2日前', assignee: null, sug: 'chore/92-sqlx-0-9', body: '<p>0.9 でマクロの API が変わっている。</p>', comments: [] },
+      { id: 85, title: 'ヘルスチェックに DB 接続の確認を含める', labels: ['bug', 'backend'], author: ME, opened: '7日前', state: 'closed', body: '<p>DB に接続できなくても <code>/healthz</code> が 200 を返す。</p>', comments: [] }
+    ],
+    prs: [
+      { num: 94, issue: 91, branch: 'feat/91-orders-currency', title: '/v2/orders に currency を追加', author: ME, state: 'open', ci: 'run', review: 'requested', reviewers: [['sato-k', 'requested']], commits: [['aa10b2c', 'currency フィールドを追加']] },
+      { num: 95, issue: null, branch: 'fix/webhook-signature-header', title: 'Webhook の署名ヘッダー名を修正', author: 'sato-k', state: 'open', ci: 'ok', review: 'requested', reviewers: [[ME, 'requested']], commits: [['0d9c8b7', 'ヘッダー名を X-Acme-Signature に統一']], diff: [] },
+      { num: 90, issue: 85, branch: 'fix/85-healthcheck-db', title: 'ヘルスチェックで DB に SELECT 1 を投げる', author: ME, state: 'merged', ci: 'ok', review: 'approved', reviewers: [['sato-k', 'approved']], commits: [['9c8d7e6', '/healthz で DB を確認']] }
+    ],
+    wts: [
+      { branch: 'main', main: true, issue: null, pr: null, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'zsh' }],
+        cursor: true,
+        term: lines(`
+$|~/dev/api-server $ git pull --ff-only
+o|Already up to date.
+$|~/dev/api-server $ `),
+        diff: [] },
+      { branch: 'feat/88-rate-limit-per-token', issue: 88, pr: null, dirty: 1, unpushed: 0, remote: false,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'wait', why: '権限の確認' }, { n: 'cargo watch' }],
+        term: lines(`
+u|> https://github.com/acme/api-server/issues/88 を実装して
+a|レート制限のキーをユーザー ID からトークン ID に変更します。
+t|Update(src/middleware/rate_limit.rs)
+m|  58 -    let key = format!("rl:user:{}", claims.user_id);
+p|  58 +    let key = format!("rl:token:{}", claims.token_id);
+t|Bash(cargo test rate_limit)
+o|test result: ok. 11 passed; 0 failed
+a|既存のカウンタを消すため、開発用 Redis のキーを削除します。
+|
+w|Bash コマンド
+w|  redis-cli --scan --pattern "rl:user:*" | xargs redis-cli del
+w|
+w|実行してよいですか？
+w|❯ 1. はい
+w|  2. いいえ、やり方を指示する (esc)`),
+        diff: [{ path: 'src/middleware/rate_limit.rs', add: 1, del: 1, lines: lines(`
+@@ -55,7 +55,7 @@ pub async fn rate_limit(req: Request, next: Next) -> Response {
+     let claims = req.extensions().get::<Claims>().unwrap();
+-    let key = format!("rl:user:{}", claims.user_id);
++    let key = format!("rl:token:{}", claims.token_id);
+     let count = redis.incr(&key).await?;`) }] },
+      { branch: 'feat/91-orders-currency', issue: 91, pr: 94, dirty: 1, unpushed: 0,
+        sessions: [{ n: 'Codex', ai: 1, st: 'run' }],
+        term: lines(`
+u|› OpenAPI の定義も更新して
+t|Edited openapi/v2.yaml (+4 -0)
+o|Order スキーマに currency を追加
+t|Ran cargo test --test openapi_contract
+o|running 4 tests
+s|◑ Working (31s)  esc で中断`),
+        diff: [{ path: 'openapi/v2.yaml', add: 4, del: 0, lines: lines(`
+@@ -212,6 +212,10 @@ components:
+         total:
+           type: integer
++        currency:
++          type: string
++          description: ISO 4217 の通貨コード
++          example: JPY
+         createdAt:`) }] },
+      { branch: 'fix/85-healthcheck-db', issue: 85, pr: 90, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'done' }],
+        term: lines(`
+t|Bash(gh pr view 90 --json state -q .state)
+o|MERGED
+d|
+d|セッションを終了しました（3日前）`),
+        diff: [] }
+    ]
+  },
+  'acme/docs': {
+    dir: '~/dev/docs',
+    issues: [
+      { id: 41, title: 'API トークンの発行手順を書き直す', labels: ['docs'], author: 'okabe', opened: '3日前', body: '<p>画面が変わったのにスクリーンショットと手順が古いまま。現行の UI に合わせて書き直す。</p>', comments: [] },
+      { id: 38, title: '用語集のリンク切れを修正', labels: ['bug', 'docs'], author: ME, opened: '6日前', body: '<p>ディレクトリ構成の変更で、用語集から各ガイドへのリンクが 12 件切れている。</p>', comments: [] },
+      { id: 42, title: 'Webhook のペイロード例を追加する', labels: ['docs'], author: 'sato-k', opened: '昨日', assignee: null, sug: 'docs/42-webhook-examples', body: '<p>イベントの種類ごとに JSON の例がほしい。</p>', comments: [] }
+    ],
+    prs: [
+      { num: 40, issue: 38, branch: 'fix/38-glossary-links', title: '用語集のリンク切れを修正', author: ME, state: 'open', ci: 'ok', review: 'approved', reviewers: [['okabe', 'approved']], commits: [['4b5c6d7', 'リンク 12 件を修正']] }
+    ],
+    wts: [
+      { branch: 'main', main: true, issue: null, pr: null, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'zsh' }],
+        cursor: true,
+        term: lines(`
+$|~/dev/docs $ git pull --ff-only
+o|Already up to date.
+$|~/dev/docs $ `),
+        diff: [] },
+      { branch: 'docs/41-token-guide', issue: 41, pr: null, dirty: 1, unpushed: 0, remote: false,
+        sessions: [{ n: 'Claude Code', ai: 1, st: 'run' }, { n: 'pnpm docs:dev' }],
+        term: lines(`
+u|> guides/api-token.md を現行の画面に合わせて書き直して
+t|Read(guides/api-token.md)
+o|96 行を読み込み
+a|「設定 > 開発者 > API トークン」に移動した点と、スコープ選択の手順を反映します。
+t|Update(guides/api-token.md)
+s|✻ Writing… (22s · esc で中断)`),
+        diff: [{ path: 'guides/api-token.md', add: 3, del: 2, lines: lines(`
+@@ -8,6 +8,7 @@
+ ## トークンを発行する
+
+-1. 右上のアイコンから「アカウント」を開く
+-2. 「API」タブで「新規作成」を押す
++1. 「設定」を開く
++2. 「開発者」>「API トークン」を選ぶ
++3. 「トークンを発行」を押し、スコープを選ぶ
+ `) }] },
+      { branch: 'fix/38-glossary-links', issue: 38, pr: 40, dirty: 0, unpushed: 0,
+        sessions: [{ n: 'Antigravity', ai: 1, st: 'done' }],
+        term: lines(`
+t|run: pnpm docs:check-links
+o|0 broken links
+a|リンク切れはすべて解消しました。
+d|
+d|セッションを終了しました（昨日 11:20）`),
+        diff: [] }
+    ]
+  }
+};
+
+/* ================= helpers ================= */
+const S = { repo: 'acme/webapp', view: 'wt', layout: 'list', sel: {}, isel: {}, psel: {}, panel: 'open', ptab: 'ov', prTab: 'conv', split: false, sess: 0 };
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const $ = id => document.getElementById(id);
+const repo = () => REPOS[S.repo];
+const cur = () => repo().wts.find(w => w.branch === S.sel[S.repo]) || ordered()[0] || repo().wts[0];
+const issueById = id => repo().issues.find(i => i.id === id) || null;
+const prByNum = n => repo().prs.find(p => p.num === n) || null;
+const wtByBranch = b => repo().wts.find(w => w.branch === b) || null;
+const openIssues = () => repo().issues.filter(i => i.state !== 'closed');
+const openPrs = () => repo().prs.filter(p => p.state !== 'merged');
+const RANK = { wait: 0, run: 1, done: 2 };
+const ST_LABEL = { wait: '指示待ち', run: '実行中', done: '終了' };
+const aiSessions = w => w.sessions.filter(s => s.ai);
+const agg = w => aiSessions(w).map(s => s.st).sort((a, b) => RANK[a] - RANK[b])[0] || 'noai';
+const whyOf = w => (aiSessions(w).find(s => s.st === 'wait') || {}).why || '';
+/* session name = the button that started it + the AI; a second one of the same kind gets a number */
+function sname(w, i) {
+  const base = s => s.btn && s.btn !== s.n ? s.btn + ' · ' + s.n : s.n;
+  const me = base(w.sessions[i]), k = w.sessions.slice(0, i).filter(s => base(s) === me).length;
+  return me + (k ? ' (' + (k + 1) + ')' : '');
+}
+/* the session to show first: one that is 指示待ち, else one that is running, else the first tab */
+function focusIdx(w) {
+  const a = w.sessions.findIndex(s => s.ai && s.st === 'wait'), b = w.sessions.findIndex(s => s.ai && s.st === 'run');
+  return a >= 0 ? a : b >= 0 ? b : 0;
+}
+function sessLines(w, i) {
+  const s = w.sessions[i], first = Math.max(0, w.sessions.findIndex(x => x.ai));
+  return s.term || (i === first ? w.term : s.ai ? lines('u|› PR の差分をレビューして\na|• main との差分を確認しました。重大な問題は見つかりませんでした。\na|• 軽微な指摘を 2 件、PR にコメントしました。\nd|\nd|セッションを終了しました（13:47）') : cmdTerm(w, s));
+}
+/* AI state belongs to a session: one chip per AI session */
+const AI_KEY = { 'Claude Code': 'claude', 'Codex': 'codex', 'Antigravity': 'agy' };
+const aiChip = (w, i, full) => {
+  const s = w.sessions[i];
+  return '<span class="ac ' + s.st + '" title="' + esc(sname(w, i)) + ' — ' + ST_LABEL[s.st] + '">' + ic(AI_KEY[s.n] || 'term', 12) + (s.st === 'wait' ? '<i class="dot"></i>' : s.st === 'run' ? '<i class="spin"></i>' : '') + (full ? '<span>' + ST_LABEL[s.st] + '</span>' : '') + '</span>';
+};
+const aiChips = (w, full) => '<span class="acs">' + w.sessions.map((s, i) => s.ai ? aiChip(w, i, full) : '').join('') + '</span>';
+
+/* which group a worktree belongs to, and the one phrase that says why */
+const GROUPS = [['need', '対応が必要'], ['ai', 'AI が作業中'], ['wait', '結果待ち'], ['done', '完了']];
+/* Reasons that do not come from an AI session (they all come from the PR). */
+function prReason(p) {
+  if (!p) return null;
+  if (p.state === 'merged') return { g: 'done', kind: 'merged', text: 'マージ済み・削除できます' };
+  if (p.ci === 'fail') return { g: 'need', kind: 'fail', text: 'CI 失敗' };
+  if (p.rc) return { g: 'need', kind: 'rc', text: 'レビューコメント ' + p.rc + '件' };
+  if (p.state === 'open' && p.review === 'approved' && p.ci === 'ok') return { g: 'need', kind: 'merge', text: 'マージできます' };
+  if (p.ci === 'run') return { g: 'wait', kind: 'ci', text: 'CI 実行中' };
+  if (p.review === 'requested' && p.author === ME) return { g: 'wait', kind: 'rev', text: 'レビュー待ち' }; // someone else's PR waits for the user's own review, not for a result
+  return null;
+}
+/* Group rule.
+   対応が必要: ANY AI session is 指示待ち, or CI failed / review comments arrived / mergeable,
+               even if another AI session in the same worktree is still running.
+   AI が作業中: at least one AI session is running and nothing in the worktree needs the user.
+   kind = what colours the row/tile; pk + text = the non-AI phrase (shown next to the session chips). */
+function need(w, r) {
+  if (w.main) return { g: 'main', kind: 'main', pk: '', text: '' };
+  const p = (r || repo()).prs.find(x => x.num === w.pr) || null, ais = aiSessions(w), pr = prReason(p);
+  const waiting = ais.some(s => s.st === 'wait'), running = ais.some(s => s.st === 'run');
+  const pk = pr ? pr.kind : '', text = pr ? pr.text : '';
+  if (waiting || (pr && pr.g === 'need')) return { g: 'need', kind: waiting ? 'wait' : pk, pk: pk, text: text };
+  if (running) return { g: 'ai', kind: 'run', pk: pk, text: text };
+  if (pr) return { g: pr.g, kind: pk, pk: pk, text: text };
+  return { g: 'need', kind: 'wait', pk: '', text: '' }; // every AI session ended and nothing is pending: the user decides what is next
+}
+const ordered = () => GROUPS.reduce((a, g) => a.concat(repo().wts.filter(w => need(w).g === g[0])), []);
+const needCount = r => r.wts.filter(w => need(w, r).g === 'need').length;
+const phrase = n => n.text ? '<span class="phr k-' + n.pk + '">' + (n.pk === 'ci' ? '<i class="spin"></i>' : '') + n.text + '</span>' : '';
+function prMini(p) {
+  if (!p) return '<span class="pm none">PR なし</span>';
+  const c = p.state === 'merged' ? '' : p.ci === 'ok' ? '<span class="ic-ok">' + ic('check', 11) + '</span>' : p.ci === 'fail' ? '<span class="ic-fail">' + ic('x', 11) + '</span>' : '<span class="ic-pend"><i class="spin"></i></span>';
+  return '<span class="pm ' + p.state + '" title="PR #' + p.num + ' ' + PR_STATE[p.state] + (p.state === 'merged' ? '' : '、' + CI[p.ci][1]) + '、作成者 ' + p.author + '">' + ic('pr', 11) + '#' + p.num + (p.state === 'draft' ? ' Draft' : '') + c + (p.author !== ME ? av(p.author) : '') + '</span>';
+}
+const wtPath = b => { const w = repo().wts.find(x => x.branch === b); return w && w.main ? repo().dir : repo().dir + '.worktrees/' + b.replace(/\//g, '-'); };
+const asg = i => i.assignee === undefined ? ME : i.assignee;
+function stage(w) {
+  const p = prByNum(w.pr);
+  if (!p) return 'none';
+  if (p.state === 'merged') return 'merged';
+  return p.review === 'none' ? 'open' : 'review';
+}
+
+const stChip = (st, why) => st === 'noai' ? '<span class="st done">AI なし</span>' : '<span class="st ' + st + '">' + (st === 'run' ? '<i class="spin"></i>' : st === 'wait' ? '<i class="dot"></i>' : '') + ST_LABEL[st] + (why ? '：' + why : '') + '</span>';
+const aiLine = w => '<div class="ai">' + (aiSessions(w).map(s => '<span class="' + s.st + '">' + esc(s.n) + ' ' + ST_LABEL[s.st] + '</span>').join('') || '<span>AI のセッションはありません</span>') + '</div>';
+const branch = b => '<span class="branch">' + ic('branch', 12) + '<span>' + esc(b) + '</span></span>';
+const mainTag = w => w && w.main ? '<span class="maintag" title="リポジトリ本体の作業ツリー">メイン</span>' : '';
+const btitle = b => '<span class="bt-title">' + ic('branch', 13) + '<span>' + esc(b) + '</span>' + mainTag(wtByBranch(b)) + '</span>';
+const wtChip = b => '<button class="chip mono" data-act="open" data-v="' + esc(b) + '" data-tab="term" title="この worktree を開く">' + ic('branch', 12) + esc(b) + '</button>';
+const av = (who, lg) => '<span class="av' + (lg ? ' lg' : '') + '" style="--h:' + (HUE[who] || 0) + '" title="' + who + '">' + who.slice(0, 2).toUpperCase() + '</span>';
+const labels = ls => ls.map(l => '<span class="lab" style="--h:' + (LABEL_HUE[l] || 200) + '">' + l + '</span>').join(' ');
+const issueLine = i => i ? '<div class="il"><span class="num">#' + i.id + '</span><span class="t">' + esc(i.title) + '</span></div>' : '<div class="il no">Issue なし</div>';
+const PR_STATE = { open: 'Open', draft: 'Draft', merged: 'Merged' };
+const CI = { run: ['pend', 'CI 実行中', '<i class="spin"></i>'], ok: ['ok', 'CI 成功', ic('check', 12)], fail: ['fail', 'CI 失敗', ic('x', 12)] };
+function prChips(p) {
+  if (!p) return '<span class="chips"><span class="chip none">PR なし</span></span>';
+  let h = '<span class="chip ' + (p.state === 'draft' ? '' : p.state) + '">' + ic('pr', 12) + '#' + p.num + ' ' + PR_STATE[p.state] + '</span>';
+  if (p.state !== 'merged') {
+    const c = CI[p.ci];
+    h += '<span class="chip ' + c[0] + '">' + c[2] + c[1] + '</span>';
+    if (p.review === 'requested') h += '<span class="chip rev">レビュー依頼中</span>';
+    if (p.review === 'approved') h += '<span class="chip ok">' + ic('check', 12) + 'Approve 済み</span>';
+    if (p.rc) h += '<span class="chip rev">レビューコメント ' + p.rc + '件</span>';
+  }
+  h += '<span class="chip who" title="PR の作成者">' + av(p.author) + (p.author === ME ? '' : p.author) + '</span>';
+  return '<span class="chips">' + h + '</span>';
+}
+function termHtml(ls, cursor) {
+  return ls.map((l, i) => {
+    const k = l.indexOf('|'), has = k === 0 || k === 1;
+    const cls = has ? l.slice(0, k) : '';
+    let txt = esc(has ? l.slice(k + 1) : l);
+    if (cls === 's') txt = txt.replace(/^(\S)/, '<span class="sp-ch">$1</span>');
+    if (cursor && i === ls.length - 1) txt += '<span class="cur"></span>';
+    return '<div class="' + (cls === '$' ? 'g' : cls) + '">' + txt + '</div>';
+  }).join('');
+}
+function cmdTerm(w, s) {
+  const pr = wtPath(w.branch) + ' $ ';
+  if (/dev/.test(s.n)) return lines('$|' + pr + s.n + '\n|\no|VITE v6.3.2  ready in 412 ms\n|\ng|  ➜  Local:   http://localhost:' + (5173 + repo().wts.indexOf(w)) + '/\nd|  ➜  Network: use --host to expose\n|\nd|14:02:11 [vite] hmr update /src/App.tsx\nd|14:06:48 [vite] hmr update /src/styles/tokens.css\nd|14:06:52 [vite] page reload src/main.tsx');
+  if (/test|watch/.test(s.n) && (prByNum(w.pr) || {}).ci === 'fail') return lines('$|' + pr + s.n + '\n|\ne| FAIL  src/server/export/csv.test.ts > 10万行をストリームで書き出せる\ne|   AssertionError: expected 99999 to be 100000\ng| ✓ src/server/export/filter.test.ts (4)\n|\no|Test Files  1 failed | 1 passed (2)\no|     Tests  1 failed | 8 passed (9)\n|\nd| FAIL  Waiting for file changes...\nd|       press h to show help, press q to quit');
+  if (/test|watch/.test(s.n)) return lines('$|' + pr + s.n + '\n|\ng| ✓ src/server/export/filter.test.ts (4)\ng| ✓ src/server/export/csv.test.ts (5)\n|\no|Test Files  2 passed (2)\no|     Tests  9 passed (9)\n|\nd| PASS  Waiting for file changes...\nd|       press h to show help, press q to quit');
+  return lines('$|' + pr + 'git status -sb\no|## ' + w.branch + (w.dirty ? '\no| M ' + ((w.diff[0] || {}).path || 'README.md') : '') + '\n$|' + pr);
+}
+
+/* ================= bar + rail ================= */
+function renderBar() {
+  $('repoBtn').innerHTML = esc(S.repo) + ic('caret', 12);
+  $('repoMenu').innerHTML = Object.keys(REPOS).map(n => {
+    const r = REPOS[n], nc = needCount(r);
+    return '<button data-act="repo" data-v="' + n + '" aria-current="' + (n === S.repo) + '"><span class="nm">' + n + '</span><span class="ct">worktree ' + r.wts.length + '</span>' + (nc ? '<span class="st wait" style="box-shadow:none">対応が必要 ' + nc + '</span>' : '') + '</button>';
+  }).join('') + '<button class="add">＋ リポジトリを追加</button>';
+  const L = [['list', '一覧＋詳細', IC.list], ['tiles', 'タイル', IC.grid]];
+  $('seg').hidden = S.view !== 'wt';
+  $('seg').innerHTML = L.map(l => '<button data-act="layout" data-v="' + l[0] + '" aria-pressed="' + (S.layout === l[0]) + '">' + l[2] + l[1] + '</button>').join('');
+  const all = Object.values(REPOS).reduce((a, r) => a + needCount(r), 0), here = needCount(repo());
+  $('alert').innerHTML = (all
+    ? '<span class="alert"><i class="dot"></i>対応が必要 ' + here + '件' + (all > here ? '<span class="ex">（他のリポジトリに ' + (all - here) + '件）</span>' : '') + '</span>'
+    : '<span class="alert none">対応が必要な worktree はありません</span>');
+  const V = [['wt', 'worktree', 'branch', repo().wts.length], ['issue', 'Issue', 'issue', openIssues().length], ['pr', 'PR', 'pr', openPrs().length]];
+  $('rail').innerHTML = V.map(v => '<button data-act="view" data-v="' + v[0] + '" aria-current="' + (S.view === v[0]) + '">' + ic(v[2], 18) + '<span>' + v[1] + '</span><span class="n">' + v[3] + '</span>' + (v[0] === 'wt' && here ? '<i class="wd" title="対応が必要な worktree があります"></i>' : '') + '</button>').join('') +
+    '<span class="sp"></span><button data-act="set-open" title="設定" aria-label="設定">' + ic('gear', 18) + '<span>設定</span></button>';
+}
+
+/* ================= worktree: list + detail ================= */
+function renderList() {
+  const w0 = cur(), m = repo().wts.find(w => w.main), ord = ordered();
+  let k = 0;
+  const row = w => {
+    const n = need(w), i = issueById(w.issue), p = prByNum(w.pr), num = ++k;
+    return '<button class="r2 k-' + n.kind + '" role="option" aria-selected="' + (w === w0) + '" data-act="sel" data-v="' + esc(w.branch) + '">' +
+      '<div class="a">' + btitle(w.branch) + aiChips(w) + (num <= 9 ? '<kbd title="Ctrl+' + num + ' で選択">' + num + '</kbd>' : '<kbd class="no"></kbd>') + '</div>' +
+      '<div class="b">' + issueLine(i) + (w.memo ? '<span class="memo" title="メモ：' + esc(w.memo) + '">' + ic('note', 11) + '<span>' + esc(w.memo) + '</span></span>' : '') + phrase(n) + prMini(p) + '</div></button>';
+  };
+  const groups = GROUPS.map(g => {
+    const ws = ord.filter(w => need(w).g === g[0]);
+    return '<div class="gh g-' + g[0] + '">' + g[1] + '<small>' + ws.length + '</small></div>' + ws.map(row).join('');
+  }).join('');
+  return '<div class="ld"><aside class="list"><div class="list-h">worktree <small>' + repo().wts.length + ' 件　Ctrl+数字で選択</small><button class="btn sm" data-act="new" title="新しい worktree" aria-label="新しい worktree">＋</button></div>' +
+    '<div class="rows" role="listbox" aria-label="worktree の一覧">' +
+    (m ? '<button class="r2 mainrow" role="option" aria-selected="' + (m === w0) + '" data-act="sel" data-v="' + esc(m.branch) + '"><div class="a">' + btitle(m.branch) + '<span class="pth mono">' + esc(repo().dir) + '</span></div></button>' : '') +
+    groups + '</div></aside>' + detail(w0) + '</div>';
+}
+function missing(a, w) {
+  if (/\{\{issue\./.test(a.cmd) && !w.issue) return 'この worktree には Issue がないので使えません';
+  if (/\{\{pr\./.test(a.cmd) && !w.pr) return 'この worktree には PR がないので使えません';
+  return '';
+}
+function actionRow(w) {
+  return '<div class="acts fit">' + actionsHere().map(a => {
+    const m = missing(a, w);
+    return '<button class="act it"' + (m ? ' disabled' : '') + ' title="' + esc(m || fullCmd(a)) + '">' + IC[a.ic] + a.name + '</button>';
+  }).join('') +
+    '<span class="more-wrap"><button class="act more" data-act="more" title="ほかのボタン" aria-label="ほかのボタン" hidden>' + IC.more + '</button><span class="more-menu" hidden></span></span>' +
+    '<button class="act add" data-act="set-open" title="ボタンを追加（設定を開く）" aria-label="ボタンを追加">＋</button></div>';
+}
+/* buttons that do not fit in one row go under the "…" menu */
+function fitActions() {
+  const box = document.querySelector('.acts.fit');
+  if (!box) return;
+  const items = Array.from(box.querySelectorAll('.act.it')), more = box.querySelector('.more'), menu = box.querySelector('.more-menu');
+  items.forEach(b => { b.hidden = false; });
+  const gap = 6, widths = items.map(b => b.offsetWidth + gap);
+  const avail = box.clientWidth - box.querySelector('.act.add').offsetWidth;
+  let cut = items.length;
+  if (widths.reduce((a, b) => a + b, 0) > avail) {
+    const lim = avail - 34 - gap;
+    let used = 0;
+    cut = 0;
+    while (cut < items.length && used + widths[cut] <= lim) used += widths[cut++];
+  }
+  items.forEach((b, i) => { b.hidden = i >= cut; });
+  more.hidden = cut === items.length;
+  if (more.hidden) menu.hidden = true;
+  menu.innerHTML = items.slice(cut).map(b => '<button class="mi"' + (b.disabled ? ' disabled' : '') + ' title="' + esc(b.title) + '">' + b.innerHTML + '</button>').join('');
+}
+function detail(w) {
+  const n = need(w), i = issueById(w.issue), p = prByNum(w.pr);
+  return '<section class="detail"><div class="dh v2">' +
+    '<div class="top"><h1>' + ic('branch', 15) + '<span>' + esc(w.branch) + '</span>' + mainTag(w) + '</h1>' + aiChips(w, true) + phrase(n) +
+    (w.main ? '' : '<button class="btn sm del" data-act="del" data-v="' + esc(w.branch) + '">' + IC.trash + '削除</button>') + '</div>' +
+    '<div class="meta">' + issueLine(i) + prChips(p) + (p && p.author !== ME ? '<span class="chip rev">レビュー用にチェックアウト</span>' : '') + '<span class="mono" title="worktree の場所">' + esc(wtPath(w.branch)) + '</span></div>' +
+    actionRow(w) + '</div>' +
+    '<div class="work p-' + S.panel + '">' + termTab(w) + panel(w) + '</div></section>';
+}
+function panel(w) {
+  const i = issueById(w.issue), p = prByNum(w.pr);
+  const T = [['ov', '概要', ''], ['issue', 'Issue', i ? '<span class="cnt">#' + i.id + '</span>' : ''], ['pr', 'PR', p ? '<span class="cnt">#' + p.num + '</span>' : ''], ['diff', '差分', '<span class="cnt">' + w.diff.length + '</span>']];
+  if (S.panel === 'closed') {
+    return '<aside class="pstrip" aria-label="情報パネル"><button data-act="panel" data-v="open" title="情報パネルを開く" aria-label="情報パネルを開く">' + IC.wide + '</button>' +
+      T.map(t => '<button data-act="ptab" data-v="' + t[0] + '" title="' + t[1] + 'を開く">' + t[1] + '</button>').join('') + '</aside>';
+  }
+  const wide = S.panel === 'wide';
+  const body = S.ptab === 'issue' ? (i ? issuePage(i) : noIssue(w)) : S.ptab === 'pr' ? (p ? prPage(p) : noPr(w)) : S.ptab === 'diff' ? diffTab(w) : overview(w);
+  return '<aside class="panel" aria-label="情報パネル"><div class="ptabs"><div class="pt-l" role="tablist">' +
+    T.map(t => '<button role="tab" aria-selected="' + (S.ptab === t[0]) + '" data-act="ptab" data-v="' + t[0] + '">' + t[1] + t[2] + '</button>').join('') + '</div>' +
+    '<button class="pc" data-act="panel" data-v="' + (wide ? 'open' : 'wide') + '" title="' + (wide ? '元の幅に戻す' : 'パネルを広げる') + '" aria-label="' + (wide ? '元の幅に戻す' : 'パネルを広げる') + '">' + (wide ? IC.narrow : IC.wide) + '</button>' +
+    '<button class="pc" data-act="panel" data-v="closed" title="パネルを閉じる" aria-label="パネルを閉じる">' + IC.close + '</button></div>' +
+    '<div class="pbody">' + body + '</div></aside>';
+}
+function overview(w) {
+  const i = issueById(w.issue), p = prByNum(w.pr), n = need(w);
+  const sec = (h, body, extra) => '<section><h3>' + h + (extra || '') + '</h3>' + body + '</section>';
+  const mergeable = n.kind === 'merge';
+  const prBody = !p ? '<div class="il no">PR なし</div>' + (w.main ? '' : '<div class="bs"><button class="btn sm" data-act="ptab" data-v="pr">PR を作成</button></div>')
+    : '<div class="t1">' + esc(p.title) + '</div>' + prChips(p) +
+      (p.state === 'merged' ? '<div class="bs"><button class="btn sm del" data-act="del" data-v="' + esc(w.branch) + '">' + IC.trash + 'worktree を削除</button></div>'
+        : '<div class="box2">' + checksBox(p) + '</div>' +
+          '<div class="rvl">' + (p.reviewers.length ? p.reviewers.map(r => '<div class="li">' + av(r[0]) + '<span class="t">' + r[0] + '</span><span class="v ' + r[1] + '">' + ({ approved: 'Approve 済み', requested: 'レビュー待ち', commented: 'コメントあり' })[r[1]] + '</span></div>').join('') : '<div class="il no">レビュアーは未指定</div>') + '</div>' +
+          '<div class="bs">' + (mergeable ? '<button class="btn sm ok">PR をマージ</button>' : '') + '<button class="btn sm" data-act="ptab" data-v="pr">PR を開く</button></div>');
+  const rc = p && p.rcList ? p.rcList.map(c => '<div class="rci">' + av(c[0]) + '<div><b>' + c[0] + '</b> <span class="mono">' + esc(c[1]) + '</span><p>' + esc(c[2]) + '</p></div></div>').join('') + '<div class="bs"><button class="btn sm" data-act="ptab" data-v="pr">PR で確認する</button></div>' : '<div class="il no">ありません</div>';
+  return '<div class="ovw">' +
+    sec('メモ', '<input class="memo-in" value="' + esc(w.memo || '') + '" placeholder="この worktree のメモ（例：レビュー指摘の修正待ち）" aria-label="メモ">') +
+    sec('Issue', i ? '<div class="t1"><span class="num">#' + i.id + '</span> ' + esc(i.title) + '</div><div class="chips"><span class="chip ' + (i.state === 'closed' ? 'merged' : 'open') + '">' + (i.state === 'closed' ? 'Closed' : 'Open') + '</span>' + labels(i.labels) + '</div><div class="bs"><button class="btn sm" data-act="ptab" data-v="issue">Issue を開く</button></div>' : '<div class="il no">Issue なし</div><div class="bs"><button class="btn sm">Issue を紐づける</button></div>') +
+    sec('PR', prBody) +
+    sec('未読のレビューコメント', rc, p && p.rc ? '<span class="badge">' + p.rc + '件</span>' : '') +
+    sec('セッション', w.sessions.map((s, k) => '<button class="sr" data-act="sess" data-v="' + k + '">' + IC.term + '<span class="t">' + esc(sname(w, k)) + '</span>' + (s.ai ? stChip(s.st) : '<span class="v">' + (/dev|watch/.test(s.n) ? '実行中のコマンド' : 'シェル') + '</span>') + '</button>').join('')) +
+    sec('変更', '<div class="li"><span class="t">未コミットの変更</span><span class="v">' + (w.dirty ? w.dirty + ' ファイル' : 'なし') + '</span></div><div class="li"><span class="t">push していないコミット</span><span class="v">' + (w.unpushed ? w.unpushed + ' コミット' : 'なし') + '</span></div><div class="bs"><button class="btn sm" data-act="ptab" data-v="diff">差分を見る</button></div>') +
+    '</div>';
+}
+const noIssue = w => '<div class="empty"><b>この worktree には Issue が紐づいていません</b><span>Issue がなくても作業は続けられます。あとから紐づけることも、ここから新しく作ることもできます。</span><div class="bs"><button class="btn pri">Issue を紐づける</button><button class="btn">Issue を作成</button></div></div>';
+function noPr(w) {
+  const i = issueById(w.issue);
+  if (w.main) return '<div class="empty"><b>メインの作業ツリーには PR がありません</b><span>PR を出す変更は、ブランチごとの worktree で作業します。</span><div class="bs"><button class="btn pri" data-act="new">＋ 新しい worktree</button></div></div>';
+  return '<div class="empty"><b>この worktree にはまだ PR がありません</b><span>ブランチ <code>' + esc(w.branch) + '</code> を push して PR を作成します。' + (i ? 'Issue #' + i.id + ' は自動でリンクされます。' : '') + '</span>' +
+    '<div class="form"><div class="field">' + esc(i ? i.title : w.branch) + '</div><div class="field" style="min-height:70px;color:var(--muted)">' + (i ? 'Closes #' + i.id : '説明を書く…') + '</div><div class="reply-a" style="margin:0"><button class="btn">Draft で作成</button><button class="btn ok">PR を作成</button></div></div></div>';
+}
+const comment = (who, when, html, first) => '<div class="cm">' + av(who, 1) + '<div class="box"><div class="hd"><b>' + who + '</b> が' + when + 'に' + (first ? '作成' : 'コメント') + '</div><div class="tx">' + html + '</div></div></div>';
+const replyBox = btns => '<div class="cm">' + av(ME, 1) + '<div><div class="reply">コメントを書く…</div><div class="reply-a">' + btns + '</div></div></div>';
+const sideWts = (wts, newAttr) => '<section><h3>worktree</h3>' + (wts.length ? wts.map(w => '<div class="li">' + wtChip(w.branch) + '</div>').join('') : '<div style="color:var(--faint);margin-bottom:6px">まだありません</div>') + '<button class="btn sm" data-act="new" ' + newAttr + '>worktree を作成</button></section>';
+
+function issuePage(i) {
+  const wts = repo().wts.filter(w => w.issue === i.id), prs = repo().prs.filter(p => p.issue === i.id), a = asg(i), closed = i.state === 'closed';
+  return '<div class="page"><div class="ph"><h2>' + esc(i.title) + ' <span class="num" style="font-size:15px">#' + i.id + '</span></h2><span class="big' + (closed ? ' closed' : '') + '">' + (closed ? 'Closed' : 'Open') + '</span><span style="color:var(--muted)"><b style="color:var(--text)">' + i.author + '</b> が' + i.opened + 'に作成、コメント ' + i.comments.length + ' 件</span></div>' +
+    '<div>' + comment(i.author, i.opened, i.body, 1) +
+    i.comments.map(c => comment(c[0], c[1], c[2])).join('') +
+    prs.map(p => '<div class="ev">' + ic('pr', 13) + '<span><b>' + p.author + '</b> がこの Issue を PR <b>#' + p.num + '</b> にリンク</span></div>').join('') +
+    (closed ? '<div class="ev">' + ic('check', 13) + '<span>PR のマージで Close されました</span></div>' : replyBox('<button class="btn">Issue を Close</button><button class="btn pri">コメントする</button>')) + '</div>' +
+    '<aside class="side">' +
+    '<section><h3>Assignees</h3>' + (a ? '<div class="li">' + av(a) + a + '</div>' : '<span style="color:var(--faint)">未指定</span>') + '</section>' +
+    '<section><h3>ラベル</h3>' + labels(i.labels) + '</section>' +
+    '<section><h3>リンクされた PR</h3>' + (prs.length ? prs.map(p => '<div class="li" style="margin-bottom:8px">' + prChips(p) + '</div>').join('') : '<span style="color:var(--faint)">まだありません</span>') + '</section>' +
+    sideWts(wts, 'data-issue="' + i.id + '"') + '</aside></div>';
+}
+
+/* terminal */
+function termTab(w) {
+  const si = Math.min(S.sess, w.sessions.length - 1);
+  const other = w.sessions.findIndex((s, i) => i !== si && !s.ai);
+  const canSplit = w.sessions.length > 1 && S.panel !== 'wide';
+  const two = S.split && canSplit;
+  const oi = other >= 0 ? other : (si + 1) % w.sessions.length;
+  const pane = i => {
+    const s = w.sessions[i];
+    const running = s.ai ? s.st === 'run' : /dev|watch/.test(s.n);
+    return '<div class="pane"><div class="pt">' + IC.term + '<span class="t">' + esc(sname(w, i)) + '</span>' + (s.ai ? stChip(s.st) : '<span>' + (running ? '実行中のコマンド' : 'シェル') + '</span>') + '</div>' +
+      '<div class="term">' + termHtml(sessLines(w, i), s.ai ? s.st === 'wait' : !running) + '</div></div>';
+  };
+  return '<div class="tw"><div class="stabs"><div class="sc" role="tablist">' +
+    w.sessions.map((s, i) => '<button class="s" role="tab" aria-selected="' + (i === si) + '" data-act="sess" data-v="' + i + '" title="' + esc(sname(w, i)) + (s.ai ? ' — ' + ST_LABEL[s.st] : '') + '">' + (s.ai ? aiChip(w, i) : IC.term) + '<span class="t">' + esc(sname(w, i)) + '</span></button>').join('') +
+    '<button class="s" title="セッションを追加" aria-label="セッションを追加">＋</button></div>' +
+    '<button class="btn sm sp" data-act="split" aria-pressed="' + two + '"' + (canSplit ? '' : ' disabled') + ' title="' + (two ? '分割を解除' : '左右に分割') + '">' + IC.split + (two ? '分割を解除' : '左右に分割') + '</button></div>' +
+    '<div class="panes' + (two ? ' split' : '') + '">' + pane(si) + (two ? pane(oi) : '') + '</div></div>';
+}
+
+/* diff */
+function fileHtml(f, review) {
+  const m = /^@@ -(\d+),?\d* \+(\d+)/.exec(f.lines[0]) || [0, 1, 1];
+  let a = +m[1], b = +m[2], h = '';
+  f.lines.forEach((l, i) => {
+    const k = l[0];
+    if (k === '@') h += '<div class="dl hunk"><span class="n"></span><span class="n"></span><span class="c">' + esc(l) + '</span></div>';
+    else if (k === '+') h += '<div class="dl add"><span class="n"></span><span class="n">' + (b++) + '</span><span class="c">' + esc(l) + '</span></div>';
+    else if (k === '-') h += '<div class="dl del"><span class="n">' + (a++) + '</span><span class="n"></span><span class="c">' + esc(l) + '</span></div>';
+    else h += '<div class="dl"><span class="n">' + (a++) + '</span><span class="n">' + (b++) + '</span><span class="c">' + esc(l || ' ') + '</span></div>';
+    if (review && f.comment && f.comment.at === i) {
+      h += '<div class="rc">' + f.comment.thread.map(c => '<div class="one">' + av(c[0]) + '<div><b>' + c[0] + '</b><small>' + c[1] + '</small><div>' + c[2] + '</div></div></div>').join('') +
+        '<div class="field">返信を書く…</div><div class="reply-a" style="justify-content:flex-start"><button class="btn sm">返信する</button><button class="btn sm">解決済みにする</button></div></div>';
+    }
+  });
+  return '<div class="file' + (review ? ' rv' : '') + '"><div class="fh"><span class="p">' + esc(f.path) + '</span><span class="plus">+' + f.add + '</span><span class="minus">−' + f.del + '</span>' + (review ? '<label style="font-family:var(--ui);font-weight:500;color:var(--muted)"><input type="checkbox"> Viewed</label>' : '') + '</div>' + h + '</div>';
+}
+function diffSum(diff, lead, tail) {
+  const add = diff.reduce((a, f) => a + f.add, 0), del = diff.reduce((a, f) => a + f.del, 0);
+  return '<div class="dsum">' + lead + '<span><b>' + diff.length + '</b> ファイル</span><span class="plus">+' + add + '</span><span class="minus">−' + del + '</span>' + (tail || '') + '</div>';
+}
+function diffTab(w) {
+  if (!w.diff.length) return '<div class="empty"><b>差分はありません</b><span>' + (w.main ? '未コミットの変更はありません。' : 'この worktree の内容は <code>main</code> と同じです。') + '</span></div>';
+  return '<div class="dwrap">' + (S.view === 'wt' && S.panel !== 'wide' ? '<button class="btn sm widen" data-act="panel" data-v="wide">' + IC.wide + 'パネルを広げて表示</button>' : '') + diffSum(w.diff, '<span>worktree の現在の内容と <code>main</code> の差分（未コミットの変更 ' + w.dirty + ' ファイルを含む）</span>') +
+    '<div class="flist">' + w.diff.map(f => '<div><span class="p">' + esc(f.path) + '</span><span class="plus">+' + f.add + '</span><span class="minus">−' + f.del + '</span></div>').join('') + '</div>' +
+    w.diff.map(f => fileHtml(f, false)).join('') + '</div>';
+}
+
+/* PR page */
+function checksBox(p) {
+  const rows = p.ci === 'ok' ? [['ok', 'lint', '18秒'], ['ok', 'typecheck', '41秒'], ['ok', 'test', '2分 6秒'], ['ok', 'build', '1分 12秒']]
+    : p.ci === 'fail' ? [['ok', 'lint', '17秒'], ['ok', 'typecheck', '39秒'], ['fail', 'test', '1 件失敗'], ['ok', 'build', '1分 10秒']]
+    : [['ok', 'lint', '18秒'], ['ok', 'typecheck', '40秒'], ['pend', 'test', '実行中'], ['pend', 'build', '実行中']];
+  const head = p.ci === 'ok' ? 'すべてのチェックが成功' : p.ci === 'fail' ? '失敗したチェックがあります' : 'チェックを実行中';
+  const m = k => k === 'ok' ? '<span class="ic-ok">' + IC.check + '</span>' : k === 'fail' ? '<span class="ic-fail">' + IC.x + '</span>' : '<span class="ic-pend"><i class="spin"></i></span>';
+  return '<div class="r h">' + m(p.ci === 'run' ? 'pend' : p.ci) + '<span class="t">' + head + '</span><small>CI（GitHub Actions）</small></div>' +
+    rows.map(r => '<div class="r">' + m(r[0]) + '<span class="t mono">' + r[1] + '</span><small>' + r[2] + '</small></div>').join('');
+}
+function prPage(p) {
+  const w = wtByBranch(p.branch), i = issueById(p.issue), diff = w ? w.diff : (p.diff || []), mine = p.author === ME;
+  const head = '<div class="ph" style="margin:16px 18px 0;border:0;padding:0"><h2>' + esc(p.title) + ' <span class="num" style="font-size:15px">#' + p.num + '</span></h2><span class="big ' + p.state + '">' + PR_STATE[p.state] + '</span><span style="color:var(--muted);display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">' + av(p.author) + '<span><b style="color:var(--text)">' + p.author + '</b> が <code>main</code> ← <code>' + esc(p.branch) + '</code> に ' + p.commits.length + ' コミットを' + (p.state === 'merged' ? 'マージしました' : 'マージしようとしています') + '</span></span></div>';
+  const sub = '<div class="sub" role="tablist">' + [['conv', 'Conversation', ''], ['files', 'Files changed', '<span class="cnt">' + diff.length + '</span>']].map(t => '<button role="tab" aria-selected="' + (S.prTab === t[0]) + '" data-act="prtab" data-v="' + t[0] + '">' + t[1] + t[2] + '</button>').join('') + '</div>';
+  if (S.prTab === 'files') {
+    return head + sub + '<div class="dwrap">' + diffSum(diff, '', '<span class="grow"></span><span>行にカーソルを置くと、レビューコメントを追加するボタンが出ます</span><button class="btn sm ok">変更をレビュー' + ic('caret', 12) + '</button>') +
+      (diff.length ? diff.map(f => fileHtml(f, true)).join('') : '<div class="empty"><span>このモックでは、この PR の差分は用意していません。</span></div>') + '</div>';
+  }
+  const rv = p.reviewers.map(r => '<div class="li">' + av(r[0]) + '<span style="flex:1">' + r[0] + '</span>' + (r[1] === 'approved' ? '<span class="ic-ok" title="Approve 済み">' + IC.check + '</span>' : '<span class="ic-pend" title="レビュー待ち"><i class="dot"></i></span>') + '</div>').join('') || '<span style="color:var(--faint)">未指定</span>';
+  const canMerge = p.state === 'open' && p.ci === 'ok' && p.review === 'approved';
+  const why = p.state === 'draft' ? 'Draft の PR はマージできません。' : p.ci === 'fail' ? 'CI が失敗しています。' : p.ci === 'run' ? 'CI の完了を待っています。' : p.review !== 'approved' ? 'レビューで Approve されるのを待っています。' : 'コンフリクトはありません。マージできます。';
+  const mergeBox = p.state === 'merged'
+    ? '<div class="mg"><span class="ic-mg">' + IC.pr + '</span><span style="flex:1"><b>マージ済み</b>　昨日 <code>main</code> にマージされました。</span>' + (w ? '<button class="btn sm del" data-act="del" data-v="' + esc(w.branch) + '">worktree を削除</button>' : '') + '</div>'
+    : '<div class="mg"><button class="btn ' + (canMerge ? 'ok' : '') + '"' + (canMerge ? '' : ' disabled') + '>PR をマージ' + ic('caret', 12) + '</button><span style="color:var(--muted);flex:1">' + why + '</span>' + (p.state === 'draft' && mine ? '<button class="btn sm">Ready for review にする</button>' : '') + '</div>';
+  const needMe = p.reviewers.some(r => r[0] === ME && r[1] === 'requested');
+  return head + sub + '<div class="page" style="padding-top:16px"><div>' +
+    comment(p.author, '', '<p>' + esc(p.title) + '。</p>' + (i ? '<p>Closes #' + i.id + '</p>' : ''), 1).replace('がに作成', 'が作成') +
+    p.commits.map(c => '<div class="ev">' + ic('branch', 13) + '<span class="sha">' + c[0] + '</span><span>' + esc(c[1]) + '</span></div>').join('') +
+    (p.reviewers.length ? '<div class="ev">' + ic('review', 13) + '<span><b>' + p.author + '</b> が <b>' + p.reviewers.map(r => r[0]).join('</b>、<b>') + '</b> にレビューを依頼</span></div>' : '') +
+    diff.filter(f => f.comment && f.comment.thread[0][1] !== '下書き').map(f => comment(f.comment.thread[0][0], f.comment.thread[0][1], '<p style="color:var(--muted);font-size:12px"><code>' + esc(f.path) + '</code> へのレビューコメント</p><p>' + f.comment.thread[0][2] + '</p>')).join('') +
+    p.reviewers.filter(r => r[1] === 'approved').map(r => '<div class="ev okc">' + IC.check + '<span><b>' + r[0] + '</b> が Approve</span></div>').join('') +
+    '<div class="box2">' + checksBox(p) + '</div><div class="box2">' + mergeBox + '</div>' +
+    (p.state === 'merged' ? '' : replyBox((mine ? '<button class="btn">PR を Close</button>' : '') + '<button class="btn pri">コメントする</button>' + (needMe ? '<button class="btn ok">Approve</button>' : ''))) + '</div>' +
+    '<aside class="side"><section><h3>Reviewers</h3>' + rv + '</section>' +
+    '<section><h3>Assignees</h3><div class="li">' + av(p.author) + p.author + '</div></section>' +
+    '<section><h3>ラベル</h3>' + (i ? labels(i.labels) : '<span style="color:var(--faint)">なし</span>') + '</section>' +
+    '<section><h3>リンクされた Issue</h3>' + (i ? '<div class="li"><span class="num">#' + i.id + '</span><span class="t">' + esc(i.title) + '</span></div>' : '<span style="color:var(--faint)">なし</span>') + '</section>' +
+    (w ? '<section><h3>worktree</h3><div class="li">' + wtChip(w.branch) + '</div></section>' : sideWts([], 'data-pr="' + p.num + '"')) + '</aside></div>';
+}
+
+/* ================= worktree: tiles ================= */
+function renderTiles() {
+  const ws = ordered().filter(w => aiSessions(w).length);
+  return '<div class="tiles ' + (ws.length <= 6 ? 'roomy' : 'dense') + '">' + ws.map(w => {
+    const n = need(w), f = focusIdx(w), s = w.sessions[f];
+    return '<article class="tile g-' + n.g + ' k-' + n.kind + '"><button class="th" data-act="open" data-v="' + esc(w.branch) + '" title="この worktree を「一覧＋詳細」で開く">' +
+      '<div class="l1">' + btitle(w.branch) + aiChips(w, true) + '</div>' +
+      '<div class="l2">' + issueLine(issueById(w.issue)) + phrase(n) + prMini(prByNum(w.pr)) + '</div></button>' +
+      '<div class="term">' + termHtml(sessLines(w, f), s.st === 'wait') + '</div>' +
+      '<div class="tf">' + IC.term + '<span class="sn">' + esc(sname(w, f)) + '</span>' + (w.sessions.length > 1 ? '<span class="more">ほか ' + (w.sessions.length - 1) + ' セッション</span>' : '') + '</div></article>';
+  }).join('') + '</div>';
+}
+
+/* ================= Issue list / PR list ================= */
+function renderIssues() {
+  const list = openIssues(), sel = list.find(i => i.id === S.isel[S.repo]) || list[0];
+  const rows = list.map(i => {
+    const wts = repo().wts.filter(w => w.issue === i.id);
+    return '<div class="row" role="option" tabindex="0" aria-selected="' + (i === sel) + '" data-act="isel" data-v="' + i.id + '">' +
+      '<div class="l1"><span class="num">#' + i.id + '</span><span class="tt">' + esc(i.title) + '</span></div>' +
+      '<div class="wl">' + labels(i.labels) + '<span>' + i.author + ' が' + i.opened + 'に作成</span></div>' +
+      '<div class="wl">' + (wts.length ? '<span>worktree ' + wts.length + '</span>' + wts.map(w => wtChip(w.branch)).join('') : '<span style="color:var(--faint)">worktree なし</span>') +
+      '<span class="sp"></span><button class="btn sm' + (wts.length ? '' : ' pri') + '" data-act="new" data-issue="' + i.id + '">worktree を作成</button></div></div>';
+  }).join('');
+  return '<div class="ld wide"><aside class="list"><div class="list-h">Issue <small>Open ' + list.length + ' 件</small><button class="btn sm">＋ Issue を作成</button></div><div class="rows" role="listbox" aria-label="Issue の一覧">' + rows + '</div></aside>' +
+    '<section class="detail"><div class="body">' + issuePage(sel) + '</div></section></div>';
+}
+function renderPrs() {
+  const list = openPrs(), sel = list.find(p => p.num === S.psel[S.repo]) || list[0];
+  const rows = list.map(p => {
+    const w = wtByBranch(p.branch), i = issueById(p.issue), needMe = p.reviewers.some(r => r[0] === ME && r[1] === 'requested');
+    return '<div class="row' + '" role="option" tabindex="0" aria-selected="' + (p === sel) + '" data-act="psel" data-v="' + p.num + '">' +
+      '<div class="l1"><span class="num">#' + p.num + '</span><span class="tt">' + esc(p.title) + '</span></div>' +
+      '<div class="wl">' + prChips(p) + (needMe ? '<span class="chip rev">あなたにレビュー依頼</span>' : '') + '</div>' +
+      '<div class="wl"><span>' + (i ? 'Issue #' + i.id : 'Issue なし') + '</span>' + (w ? wtChip(w.branch) : '<span class="branch">' + ic('branch', 12) + '<span>' + esc(p.branch) + '</span></span><span style="color:var(--faint)">（worktree なし）</span>') +
+      '<span class="sp"></span>' + (w ? '' : '<button class="btn sm pri" data-act="new" data-pr="' + p.num + '">worktree を作成</button>') + '</div></div>';
+  }).join('');
+  return '<div class="ld wide"><aside class="list"><div class="list-h">PR <small>Open ' + list.length + ' 件（他の人の PR を含む）</small></div><div class="rows" role="listbox" aria-label="PR の一覧">' + rows + '</div></aside>' +
+    '<section class="detail"><div class="body">' + (sel ? prPage(sel) : '<div class="empty"><b>Open な PR はありません</b></div>') + '</div></section></div>';
+}
+
+/* ================= dialogs ================= */
+function showNew(issueId, prNum) {
+  const i = issueId ? issueById(+issueId) : null, p = prNum ? prByNum(+prNum) : null;
+  const n = i ? repo().wts.filter(w => w.issue === i.id).length : 0;
+  const b = p ? p.branch : i ? (i.sug || 'feat/' + i.id) + (n ? '-' + (n + 1) : i.sug ? '' : '-') : '';
+  const title = p ? 'PR #' + p.num + ' から worktree を作成' : i ? 'Issue #' + i.id + ' から worktree を作成' : '新しい worktree';
+  $('dlg').innerHTML = '<div class="dlg-h"><h2>' + title + '</h2></div><div class="dlg-b"><div class="frm">' +
+    (p ? '<label>PR</label><div>' + prChips(p) + '<div style="margin-top:4px">' + esc(p.title) + '</div></div>' : '') +
+    '<label>Issue</label>' + (i ? '<div>' + issueLine(i) + '</div>' : p ? '<div class="il no">' + (p.issue ? '' : 'なし') + '</div>' : '<select><option>なし（あとで紐づけられます）</option>' + openIssues().map(x => '<option>#' + x.id + ' ' + esc(x.title) + '</option>').join('') + '</select>') +
+    '<label>ブランチ</label><input class="mono" value="' + esc(b) + '" placeholder="spike/try-something"' + (p ? ' readonly' : '') + '>' +
+    (p ? '<div class="note"><code>origin/' + esc(p.branch) + '</code> をチェックアウトします。</div>' : (n ? '<div class="note">この Issue にはすでに worktree が ' + n + ' つあります。別のブランチとして作成します。</div>' : '')) +
+    (p ? '' : '<label>作成元</label><select><option>main（origin の最新）</option><option>現在選択中のブランチ</option></select>') +
+    '<label>場所</label><input class="mono" value="' + esc(wtPath(b || 'spike/try-something')) + '">' +
+    '<label>作成後に実行</label><select><option>何もしない</option>' + actionsHere().filter(a => a.kind === 'ai').map(a => '<option' + ((p && a.ic === 'review') || (i && !p && a.ic === 'issue') ? ' selected' : '') + '>' + a.name + '</option>').join('') + '</select>' +
+    '</div></div><div class="dlg-f"><button class="btn" data-act="dlg-close">キャンセル</button><button class="btn pri" data-act="dlg-close">worktree を作成</button></div>';
+  $('dlgOv').hidden = false;
+}
+function showDelete(b) {
+  const w = wtByBranch(b), p = prByNum(w.pr), mine = !p || p.author === ME;
+  const running = w.sessions.filter(s => s.ai ? s.st !== 'done' : /dev|watch/.test(s.n));
+  const hasRemote = w.remote !== false;
+  const row = (warn, t, v, note) => '<div class="chk' + (warn ? ' warn' : '') + '"><i class="m">' + (warn ? '!' : ic('check', 11)) + '</i><b>' + t + '</b><span class="v">' + v + '</span>' + (note ? '<small>' + note + '</small>' : '') + '</div>';
+  const prText = !p ? ['PR はありません', ''] : p.state === 'merged' ? ['#' + p.num + ' Merged', 'マージ済みなので、削除しても変更は失われません。'] : ['#' + p.num + ' ' + PR_STATE[p.state] + (mine ? '' : '（' + p.author + ' の PR）'), 'worktree を削除しても PR は残ります。'];
+  $('dlg').innerHTML = '<div class="dlg-h"><h2>worktree を削除</h2></div><div class="dlg-b">' +
+    '<div style="margin-bottom:6px">' + btitle(w.branch) + '<div class="mono" style="color:var(--muted);margin-top:2px">' + esc(wtPath(w.branch)) + '</div></div>' +
+    row(w.dirty > 0, '未コミットの変更', w.dirty ? w.dirty + ' ファイル' : 'なし', w.dirty ? '削除すると元に戻せません。' : '') +
+    row(w.unpushed > 0, 'push していないコミット', w.unpushed ? w.unpushed + ' コミット' : 'なし', w.unpushed ? (hasRemote ? 'ローカルブランチを残せばコミットは残ります。' : 'リモートにブランチがありません。ローカルブランチも削除すると、コミットは失われます。') : '') +
+    row(running.length > 0, '実行中のターミナルセッション', running.length ? running.length + ' 件' : 'なし', running.length ? running.map(s => esc(s.n) + (s.ai ? '（' + ST_LABEL[s.st] + '）' : '')).join('、') + ' を終了します。' : '') +
+    row(false, 'PR の状態', prText[0], prText[1]) +
+    '<label class="opt"><input type="checkbox"' + (p && p.state === 'merged' ? ' checked' : '') + '><span>ローカルブランチ <code>' + esc(w.branch) + '</code> も削除する</span></label>' +
+    '<label class="opt' + (hasRemote && mine ? '' : ' off') + '"><input type="checkbox"' + (hasRemote && mine ? '' : ' disabled') + '><span>リモートブランチ <code>origin/' + esc(w.branch) + '</code> も削除する<small>' + (!hasRemote ? 'リモートにブランチはありません。' : !mine ? p.author + ' のブランチなので削除できません。' : p && p.state !== 'merged' ? '削除すると PR #' + p.num + ' は Close されます。' : '') + '</small></span></label>' +
+    '</div><div class="dlg-f"><button class="btn" data-act="dlg-close">キャンセル</button><button class="btn danger" data-act="dlg-close">worktree を削除</button></div>';
+  $('dlgOv').hidden = false;
+}
+function renderSettings() {
+  const scopeSel = v => '<select aria-label="対象">' + [ALL].concat(Object.keys(REPOS)).map(r => '<option' + (r === v ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
+  const what = a => a.kind === 'ai'
+    ? '<div class="what"><span class="chip">' + IC[a.ai] + AIS[a.ai].name + '</span>' + (a.cmd ? '<span class="lb">最初の指示</span><code>' + esc(a.cmd) + '</code>' : '<span class="lb">最初の指示なし</span>') + '</div>'
+    : '<code>' + esc(a.cmd) + '</code>';
+  const rows = ACTIONS.map(a => '<tr><td class="grip" title="ドラッグして並べ替え">' + IC.grip + '</td><td><span class="ic">' + IC[a.ic] + '</span></td><td><b>' + a.name + '</b></td><td><span class="kind ' + a.kind + '">' + (a.kind === 'ai' ? 'AI' : 'コマンド') + '</span></td><td>' + what(a) + '</td><td>' + (a.scope === ALL ? a.scope : '<span class="mono">' + a.scope + '</span>') + '</td><td><div class="ops"><button class="btn sm">編集</button><button class="btn sm del">削除</button></div></td></tr>').join('');
+  const edit = '<tr class="edit"><td class="grip">' + IC.grip + '</td><td><button class="ic" title="アイコンを選ぶ" aria-label="アイコンを選ぶ">' + IC.review + '</button></td><td><input value="/review-pr" aria-label="名前"></td>' +
+    '<td><select aria-label="種類"><option selected>AI</option><option>コマンド</option></select></td>' +
+    '<td><div class="what"><select aria-label="AI" style="width:140px"><option selected>Claude Code</option><option>Codex</option><option>Antigravity</option></select><input class="mono" value="/review-pr {{pr.url}}" aria-label="最初の指示" placeholder="最初の指示（空でもよい）"></div></td>' +
+    '<td>' + scopeSel(ALL) + '</td><td><div class="ops"><button class="btn sm pri">保存</button><button class="btn sm">キャンセル</button></div></td></tr>';
+  const PH = [['worktree.path', 'worktree のパス'], ['branch', 'ブランチ名'], ['issue.number', 'Issue の番号'], ['issue.url', 'Issue の URL'], ['issue.title', 'Issue のタイトル'], ['pr.number', 'PR の番号'], ['pr.url', 'PR の URL']];
+  $('setC').innerHTML = '<h2>AI の起動コマンド</h2><p>AI を起動するときに実行するコマンドです。初期設定はオプションなしのコマンドで、オプションを付けたいときはここを書き換えます。種類が「AI」のボタンは、ここのコマンドに「最初の指示」を付けて実行します。</p>' +
+    '<table class="bt" style="max-width:860px"><thead><tr><th style="width:64px"></th><th style="width:150px">AI</th><th>起動コマンド</th><th style="width:150px"></th></tr></thead><tbody>' +
+    Object.keys(AIS).map(k => '<tr><td><span class="ic">' + IC[k] + '</span></td><td><b>' + AIS[k].name + '</b></td><td><input class="mono" value="' + esc(AIS[k].cmd) + '" aria-label="' + AIS[k].name + ' の起動コマンド"><div class="defl">初期設定: <code>' + AIS[k].def + '</code>' + (AIS[k].cmd !== AIS[k].def ? '<span class="chg">変更済み</span>' : '') + '</div></td><td><div class="ops"><button class="btn sm"' + (AIS[k].cmd === AIS[k].def ? ' disabled' : '') + '>初期設定に戻す</button></div></td></tr>').join('') + '</tbody></table>' +
+    '<h2 style="margin-top:30px">アクションボタン</h2><p>worktree ごとに並ぶボタンです。押すと、その worktree をカレントディレクトリにして、アプリ内のターミナルで実行します。種類は2つあります。「AI」は上の起動コマンドで AI を起動し、最初の指示があればそれを渡します。「コマンド」は書いたコマンドをそのまま実行します。</p>' +
+    '<div class="prev"><span><span class="mono">' + S.repo + '</span> での表示</span><div class="acts">' + actionsHere().map(a => '<span class="act">' + IC[a.ic] + a.name + '</span>').join('') + '</div></div>' +
+    '<table class="bt"><thead><tr><th style="width:30px"></th><th style="width:80px">アイコン</th><th style="width:150px">名前</th><th style="width:96px">種類</th><th>実行する内容</th><th style="width:200px">対象</th><th style="width:150px"></th></tr></thead><tbody>' + rows + edit + '</tbody></table>' +
+    '<div style="margin-top:12px"><button class="btn">＋ ボタンを追加</button></div>' +
+    '<div class="ph-note"><h3>最初の指示とコマンドで使えるプレースホルダー</h3><dl>' + PH.map(x => '<dt><code>{{' + x[0] + '}}</code></dt><dd>' + x[1] + '</dd>').join('') + '</dl>' +
+    '<p>ボタンを押した worktree の値に置き換えてから実行します。値がない worktree（Issue や PR がまだない worktree）では、そのプレースホルダーを使うボタンは押せなくなります。</p></div>';
+}
+
+/* ================= render + events ================= */
+function render() {
+  renderBar();
+  $('main').innerHTML = S.view === 'issue' ? renderIssues() : S.view === 'pr' ? renderPrs() : S.layout === 'tiles' ? renderTiles() : renderList();
+  fitActions();
+}
+function select(b) { S.sel[S.repo] = b; S.sess = focusIdx(wtByBranch(b)); S.prTab = 'conv'; S.view = 'wt'; S.layout = 'list'; }
+function act(t) {
+  const a = t.dataset.act, v = t.dataset.v;
+  if (a === 'repo-menu') { $('repoMenu').hidden = !$('repoMenu').hidden; return; }
+  if (a === 'more') { const m = document.querySelector('.more-menu'); m.hidden = !m.hidden; return; }
+  if (a === 'new') { showNew(t.dataset.issue, t.dataset.pr); return; }
+  if (a === 'del') { showDelete(v); return; }
+  if (a === 'dlg-close') { $('dlgOv').hidden = true; return; }
+  if (a === 'set-open') { renderSettings(); $('setOv').hidden = false; return; }
+  if (a === 'set-close') { $('setOv').hidden = true; return; }
+  if (a === 'repo') { S.repo = v; S.sess = focusIdx(cur()); S.prTab = 'conv'; $('repoMenu').hidden = true; }
+  if (a === 'view') { S.view = v; S.prTab = 'conv'; }
+  if (a === 'layout') S.layout = v;
+  if (a === 'sel' || a === 'open') select(v);
+  if (a === 'isel') S.isel[S.repo] = +v;
+  if (a === 'psel') { S.psel[S.repo] = +v; S.prTab = 'conv'; }
+  if (a === 'panel') S.panel = v;
+  if (a === 'ptab') { S.ptab = v; if (S.panel === 'closed') S.panel = 'open'; }
+  if (a === 'prtab') S.prTab = v;
+  if (a === 'sess') S.sess = +v;
+  if (a === 'split') S.split = !S.split;
+  render();
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.repo')) $('repoMenu').hidden = true;
+  const mm = document.querySelector('.more-menu');
+  if (mm && !e.target.closest('.more-wrap')) mm.hidden = true;
+  if (e.target.id === 'dlgOv') { $('dlgOv').hidden = true; return; }
+  const t = e.target.closest('[data-act]');
+  if (t) act(t);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { $('dlgOv').hidden = true; $('setOv').hidden = true; $('repoMenu').hidden = true; }
+  if (e.key === 'Enter' && e.target.matches('div[data-act]')) act(e.target);
+  if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+    if (/^[1-9]$/.test(e.key)) {
+      const w = ordered()[+e.key - 1];
+      if (w) { e.preventDefault(); select(w.branch); render(); }
+    }
+  }
+});
+window.addEventListener('resize', fitActions);
+S.sess = focusIdx(cur());
+render();
+</script>
+</body>
+</html>
